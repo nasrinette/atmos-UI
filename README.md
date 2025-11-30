@@ -4,13 +4,11 @@ Weather and time-aware visual effects for UI elements—icons, widgets, and comp
 
 **Demo:** https://nasrinette.github.io/atmos-UI/
 
-
 https://github.com/user-attachments/assets/61c2abfd-0a29-42de-926a-035b48f853c4
-
 
 ## Concept
 
-Instead of dynamic wallpapers, AtmosUI applies ambient effects directly to UI components. Sunny conditions produce warm glints on icons; rain creates soft rippling reflections; night brings luminescent accents. Users keep their preferred wallpaper while getting real-time environmental cues at a glance.
+Our concept is to let icons, widgets, and other parts of the interface react to real weather and its intensity without changing the user’s wallpaper. When it’s sunny, elements can show soft highlights; when it’s raining, they can show gentle ripple-like effects that get stronger with heavier rain; fog can add a mild hazy look; and snow can bring light shimmering touches that increase as snowfall gets heavier. These effects sit naturally on top of any background, giving users a quick sense of the weather while keeping the look they already like.
 
 ## Project Structure
 
