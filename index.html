@@ -103,7 +103,7 @@
       }
       .wallpaper.active { opacity: 1; }
 
-      /* --- SUN MODE EFFECTS (Layer 1) --- */
+      /* --- Sun Mode Effects (Layer 1) --- */
       
       /* 1. Rotating Sun Rays - ENHANCED */
       .sun-rays {
@@ -254,7 +254,7 @@
       <div class="mt-6 pt-4 border-t border-gray-700">
         <p class="text-[11px] text-gray-400 leading-relaxed">
           <span class="text-white font-semibold">Features:</span><br>
-          <span class="text-yellow-200">• Sun:</span> Enhanced rays, icon glow<br>
+          <span class="text-yellow-200">• Sun:</span> Enhanced rays, icon glow, more dust<br>
           <span class="text-blue-300">• Rain:</span> Drop physics, splashes<br>
         </p>
       </div>
@@ -458,8 +458,8 @@
             // Add Glow
             icons.forEach(icon => icon.classList.add('sun-glow'));
 
-            // Spawn Dust
-            for(let i=0; i<40; i++) particles.dust.push(new Dust());
+            // Spawn Dust (Balanced amount)
+            for(let i=0; i<60; i++) particles.dust.push(new Dust());
 
         } else {
             sunRays.classList.remove("active");
@@ -587,7 +587,8 @@
           this.y = Math.random() * state.height;
           this.vx = (Math.random() - 0.5) * 0.5;
           this.vy = (Math.random() - 0.5) * 0.5;
-          this.size = Math.random() * 2.5; /* Slightly larger */
+          // Balanced size: 0.5px to 3.5px
+          this.size = Math.random() * 3 + 0.5; 
           this.alpha = 0;
           this.lifePhase = Math.random() * 10;
           this.speed = 0.02 + Math.random() * 0.02;
