@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextGen Weather UI - Sun Mode</title>
+    <title>NextGen Weather UI - Rain Widget Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for the Rain Shader -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
@@ -105,14 +107,14 @@
 
       /* --- Sun Mode Effects (Layer 1) --- */
       
-      /* 1. Rotating Sun Rays - ENHANCED */
+      /* 1. Rotating Sun Rays */
       .sun-rays {
         position: absolute;
         top: -50%; left: -50%; width: 200%; height: 200%;
         background: conic-gradient(
             from 0deg at 50% 50%,
             rgba(255, 255, 255, 0) 0deg,
-            rgba(255, 230, 150, 0.4) 10deg, /* Stronger opacity */
+            rgba(255, 230, 150, 0.4) 10deg,
             rgba(255, 255, 255, 0) 25deg,
             rgba(255, 240, 180, 0.3) 45deg,
             rgba(255, 255, 255, 0) 70deg,
@@ -120,10 +122,9 @@
             rgba(255, 255, 255, 0) 110deg
         );
         animation: rotateRays 80s linear infinite;
-        /* Sharper mask for more "defined" rays */
         mask-image: radial-gradient(circle at 70% 30%, black 0%, transparent 65%);
         -webkit-mask-image: radial-gradient(circle at 70% 30%, black 0%, transparent 65%);
-        mix-blend-mode: screen; /* Brighter blending */
+        mix-blend-mode: screen; 
         pointer-events: none; opacity: 0; transition: opacity 1.5s ease;
         z-index: 1;
       }
@@ -173,7 +174,7 @@
         display: flex; flex-direction: column; overflow: hidden;
       }
 
-      /* Layer 10: Canvas (Weather & Dust) */
+      /* Layer 10: Canvas (Global Weather & Dust) */
       #weatherCanvas {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
         pointer-events: none; transition: clip-path 0.6s cubic-bezier(0.7, 0, 0.3, 1);
@@ -203,28 +204,22 @@
         backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.5s ease; position: relative; z-index: 1;
       }
-      /* SUN GLOW - Fallback class */
-      .app-icon.sun-glow {
-        /* JS handles dynamic intensity now */
-      }
       
       .app-item:active .app-icon { transform: scale(0.92); }
       .app-name { font-size: 12px; color: white; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); font-weight: 500; }
 
       /* --- WIDGET STYLING --- */
       .app-widget {
-        grid-column: span 4; /* Spans full width (4 cols) */
-        grid-row: span 1;    /* Spans 1 row */
-        height: 90px;        /* Fixed height for single row */
-        /* Dark transparent glass style */
+        grid-column: span 4;
+        grid-row: span 1;
+        height: 90px;
         background: rgba(0, 0, 0, 0.3);
         backdrop-filter: none;
         border-radius: 24px;
-        /* Increased border and shadow for more "pop" */
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0,0,0,0.2);
         display: flex;
-        flex-direction: row; /* Horizontal layout */
+        flex-direction: row;
         justify-content: space-between;
         align-items: center;
         padding: 0 24px;
@@ -232,59 +227,41 @@
         position: relative;
         z-index: 1;
         transition: all 0.5s ease;
-        /* overflow: hidden; Removed for highlight */
+        overflow: hidden; /* Ensure shader canvas stays inside */
       }
 
-      /* Specular highlight removed */
-      
-      .widget-left {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+      /* This is the container for the 3D rain shader */
+      #rain-canvas-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1; /* Behind the text */
+        opacity: 0;
+        transition: opacity 1.5s ease;
+        border-radius: 24px;
+        overflow: hidden;
+      }
+      #rain-canvas-container.active {
+        opacity: 1;
       }
 
-      .widget-right {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-      }
+      .widget-left { display: flex; flex-direction: column; justify-content: center; z-index: 2; }
+      .widget-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; z-index: 2; }
       
-      .widget-header {
-        text-transform: uppercase;
-        font-size: 11px;
-        font-weight: 600;
-        opacity: 0.7;
-        margin-top: 2px;
-      }
-      
-      .widget-main {
-        font-size: 36px; /* Larger time for horizontal */
-        font-weight: 300;
-        line-height: 1;
-        letter-spacing: -1px;
-      }
-      
-      .widget-sub {
-        font-size: 13px;
-        opacity: 0.9;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+      .widget-header { text-transform: uppercase; font-size: 11px; font-weight: 600; opacity: 0.7; margin-top: 2px; }
+      .widget-main { font-size: 36px; font-weight: 300; line-height: 1; letter-spacing: -1px; }
+      .widget-sub { font-size: 13px; opacity: 0.9; display: flex; align-items: center; gap: 8px; }
 
       /* --- DOCK STYLING --- */
       .dock-container {
-        /* Matches app-widget aesthetic */
         background: rgba(0, 0, 0, 0.3);
-        backdrop-filter: none;
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0,0,0,0.2);
-        
         position: relative;
         z-index: 1;
-        /* overflow: hidden; Removed for highlight */
-        border-radius: 35px; /* Dock shape */
+        border-radius: 35px;
         padding: 16px;
         display: flex;
         justify-content: space-between;
@@ -292,8 +269,6 @@
         padding-left: 24px;
         padding-right: 24px;
       }
-
-      /* Specular highlight for dock removed */
 
       /* Gradients */
       .bg-blue-glass { background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(29, 78, 216, 0.8)); }
@@ -324,12 +299,11 @@
         Snowing
       </button>
 
-      <!-- Sun Slider Container (Hidden by default) -->
+      <!-- Sun Slider -->
       <div id="sunSliderContainer" class="transition-all duration-300 ease-in-out overflow-hidden max-h-0 opacity-0 mb-2">
         <div class="mt-4 pt-4 border-t border-gray-700">
             <label class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                Sun Intensity
-                <span id="sunVal" class="text-white">1x</span>
+                Sun Intensity <span id="sunVal" class="text-white">1x</span>
             </label>
             <input type="range" min="0" max="3" step="0.2" value="1" 
                    class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-yellow-400"
@@ -337,12 +311,11 @@
         </div>
       </div>
 
-      <!-- Rain Slider Container (Hidden by default) -->
+      <!-- Rain Slider -->
       <div id="rainSliderContainer" class="transition-all duration-300 ease-in-out overflow-hidden max-h-0 opacity-0 mb-2">
         <div class="mt-4 pt-4 border-t border-gray-700">
             <label class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                Rain Intensity
-                <span id="rainVal" class="text-white">1x</span>
+                Rain Intensity <span id="rainVal" class="text-white">1x</span>
             </label>
             <input type="range" min="0.2" max="4" step="0.2" value="1" 
                    class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-400"
@@ -350,12 +323,11 @@
         </div>
       </div>
 
-      <!-- Snow Slider Container (Hidden by default) -->
+      <!-- Snow Slider -->
       <div id="snowSliderContainer" class="transition-all duration-300 ease-in-out overflow-hidden max-h-0 opacity-0 mb-2">
         <div class="mt-4 pt-4 border-t border-gray-700">
             <label class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                Snow Intensity
-                <span id="snowVal" class="text-white">1x</span>
+                Snow Intensity <span id="snowVal" class="text-white">1x</span>
             </label>
             <input type="range" min="0.2" max="4" step="0.2" value="1" 
                    class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-white"
@@ -366,9 +338,7 @@
       <div class="mt-6 pt-4 border-t border-gray-700">
         <p class="text-[11px] text-gray-400 leading-relaxed">
           <span class="text-white font-semibold">Interaction Detail:</span><br>
-          Raindrops physics enabled. Drops hit icons, adhere, and
-          <span class="text-blue-300">trickle down</span> the surface before
-          falling off.
+          Select <span class="text-blue-300">Raining</span> to see the Three.js shader effect applied specifically to the Weather Widget glass surface.
         </p>
       </div>
     </div>
@@ -391,7 +361,7 @@
         <div id="sunRays" class="sun-rays active"></div>
         <div id="sunFilter" class="sun-filter active"></div>
 
-        <!-- WEATHER LAYER -->
+        <!-- GLOBAL PARTICLE LAYER (Original Canvas) -->
         <canvas id="weatherCanvas" width="366" height="776"></canvas>
 
         <!-- APP VIEW -->
@@ -402,20 +372,12 @@
                 <span class="material-symbols-outlined text-gray-800">arrow_back</span>
               </button>
               <span id="appTitle" class="ml-4 font-bold text-xl text-gray-900">App Name</span>
-              <div class="ml-auto flex gap-3">
-                <span class="material-symbols-outlined text-gray-400">search</span>
-                <span class="material-symbols-outlined text-gray-400">more_vert</span>
-              </div>
             </div>
             <div class="flex-1 overflow-y-auto bg-white p-4">
               <div class="space-y-4 animate-pulse">
                 <div class="h-40 bg-gray-100 rounded-2xl"></div>
                 <div class="h-4 w-3/4 bg-gray-100 rounded"></div>
                 <div class="h-4 w-1/2 bg-gray-100 rounded"></div>
-                <div class="grid grid-cols-2 gap-3 mt-6">
-                  <div class="h-32 bg-gray-50 rounded-xl border border-gray-100"></div>
-                  <div class="h-32 bg-gray-50 rounded-xl border border-gray-100"></div>
-                </div>
               </div>
             </div>
           </div>
@@ -427,7 +389,6 @@
           
           <!-- Dock -->
           <div class="mt-auto mb-6 px-5">
-            <!-- UPDATED DOCK CONTAINER CLASS -->
             <div class="dock-container shadow-xl">
               <div class="app-item" onclick="openApp('Phone')">
                 <div class="app-icon bg-green-glass"><span class="material-symbols-outlined">call</span></div>
@@ -457,6 +418,159 @@
         </div>
       </div>
     </div>
+
+    <!-- THREE.JS SHADERS FOR WIDGET RAIN -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        #ifdef GL_ES
+        precision highp float;
+        #endif
+
+        varying vec2 vUv;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        uniform float u_speed;
+        uniform float u_intensity;
+        uniform float u_normal;
+        
+        #define S(a, b, t) smoothstep(a, b, t)
+
+        vec3 N13(float p) {
+            vec3 p3 = fract(vec3(p) * vec3(.1031, .11369, .13787));
+            p3 += dot(p3, p3.yzx + 19.19);
+            return fract(vec3((p3.x + p3.y) * p3.z, (p3.x + p3.z) * p3.y, (p3.y + p3.z) * p3.x));
+        }
+
+        float N(float t) {
+            return fract(sin(t * 12345.564) * 7658.76);
+        }
+
+        float Saw(float b, float t) {
+            return S(0., b, t) * S(1., b, t);
+        }
+
+        vec2 DropLayer2(vec2 uv, float t) {
+            vec2 UV = uv;
+
+            uv.y += t * 0.75;
+            // WAS: vec2 a = vec2(6., 1.);
+            // NOW: Much smaller x value makes drops wider/bigger
+            vec2 a = vec2(2.0, 1.); 
+            vec2 grid = a * 2.;
+            vec2 id = floor(uv * grid);
+
+            float colShift = N(id.x);
+            uv.y += colShift;
+
+            id = floor(uv * grid);
+            vec3 n = N13(id.x * 35.2 + id.y * 2376.1);
+            vec2 st = fract(uv * grid) - vec2(.5, 0);
+
+            float x = n.x - .5;
+
+            float y = UV.y * 20.;
+            float wiggle = sin(y + sin(y));
+            x += wiggle * (.5 - abs(x)) * (n.z - .5);
+            x *= .7;
+            float ti = fract(t + n.z);
+            y = (Saw(.85, ti) - .5) * .9 + .5;
+            vec2 p = vec2(x, y);
+
+            float d = length((st - p) * a.yx);
+
+            float mainDrop = S(.4, .0, d);
+
+            float r = sqrt(S(1., y, st.y));
+            float cd = abs(st.x - x);
+            float trail = S(.23 * r, .15 * r * r, cd);
+            float trailFront = S(-.02, .02, st.y - y);
+            trail *= trailFront * r * r;
+
+            y = UV.y;
+            float trail2 = S(.2 * r, .0, cd);
+            float droplets = max(0., (sin(y * (1. - y) * 120.) - st.y)) * trail2 * trailFront * n.z;
+            y = fract(y * 10.) + (st.y - .5);
+            float dd = length(st - vec2(x, y));
+            droplets = S(.3, 0., dd);
+            float m = mainDrop + droplets * r * trailFront;
+
+            return vec2(m, trail);
+        }
+
+        float StaticDrops(vec2 uv, float t) {
+            // WAS: uv *= 40.;
+            // NOW: Smaller number = Bigger drops
+            uv *= 10.;
+
+            vec2 id = floor(uv);
+            uv = fract(uv) - .5;
+            vec3 n = N13(id.x * 107.45 + id.y * 3543.654);
+            vec2 p = (n.xy - .5) * .7;
+            float d = length(uv - p);
+
+            float fade = Saw(.025, fract(t + n.z));
+            float c = S(.3, 0., d) * fract(n.z * 10.) * fade;
+            return c;
+        }
+
+        vec2 Drops(vec2 uv, float t, float l0, float l1, float l2) {
+            float s = StaticDrops(uv, t) * l0;
+            vec2 m1 = DropLayer2(uv, t) * l1;
+            vec2 m2 = DropLayer2(uv * 1.85, t) * l2;
+
+            float c = s + m1.x + m2.x;
+            c = S(.3, 1., c);
+
+            return vec2(c, max(m1.y * l0, m2.y * l1));
+        }
+
+        void main() {
+            vec2 uv = (gl_FragCoord.xy - .5 * u_resolution.xy) / u_resolution.y;
+            float T = u_time;
+            
+            float t = T * .2 * u_speed;
+            float rainAmount = u_intensity;
+
+            float staticDrops = S(-.5, 1., rainAmount) * 2.;
+            float layer1 = S(.25, .75, rainAmount);
+            float layer2 = S(.0, .5, rainAmount);
+
+            vec2 c = Drops(uv, t, staticDrops, layer1, layer2);
+            vec2 e = vec2(.001, 0.) * u_normal;
+            float cx = Drops(uv + e, t, staticDrops, layer1, layer2).x;
+            float cy = Drops(uv + e.yx, t, staticDrops, layer1, layer2).x;
+            vec2 n = vec2(cx - c.x, cy - c.x); // Normal
+
+            // --- TRANSPARENT LIGHTING MODEL ---
+            
+            // 1. Calculate lighting based on the drop shape (normals)
+            vec3 lightDir = normalize(vec3(0.5, 1.0, 1.0)); 
+            vec3 normal = normalize(vec3(n.x * 5.0, n.y * 5.0, 1.0)); 
+            float lighting = max(0.0, dot(normal, lightDir));
+            float specular = pow(max(0.0, dot(reflect(-lightDir, normal), vec3(0.0, 0.0, 1.0))), 20.0);
+
+            // 2. Base opacity logic:
+            // If the surface is flat (n is near 0), it should be transparent.
+            // If it's curved (a drop), it should be visible.
+            float dropAlpha = smoothstep(0.0, 0.05, length(n)); 
+
+            // 3. Drop Color (Glassy/White/Blueish)
+            vec3 dropColor = vec3(0.9, 0.95, 1.0); 
+            
+            // 4. Combine
+            vec3 finalColor = dropColor * lighting + vec3(specular);
+            
+            // Output: Alpha is driven by the drop shape + rain intensity
+            gl_FragColor = vec4(finalColor, dropAlpha * 0.7 * u_intensity); 
+        }
+    </script>
 
     <script>
       // --- App Data ---
@@ -494,11 +608,104 @@
       const sunRays = document.getElementById("sunRays");
       const sunFilter = document.getElementById("sunFilter");
 
+      // --- THREE.JS RAIN WIDGET CONTROLLER ---
+      class RainWidget {
+        constructor() {
+          this.container = null;
+          this.scene = null;
+          this.camera = null;
+          this.renderer = null;
+          this.material = null;
+          this.clock = new THREE.Clock();
+          this.rafId = null;
+          this.isPlaying = false;
+        }
+
+        init(containerId) {
+            this.container = document.getElementById(containerId);
+            if (!this.container) return;
+
+            const width = this.container.clientWidth;
+            const height = this.container.clientHeight;
+
+            // Scene setup
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            
+            this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            this.renderer.setSize(width, height);
+            this.renderer.setClearColor(0x000000, 0); // Transparent clear
+            this.container.appendChild(this.renderer.domElement);
+
+            // Create Mesh without texture dependency
+            this.createMesh(width, height);
+        }
+
+        createMesh(width, height) {
+            const vertexShader = document.getElementById('vertexShader').textContent;
+            const fragmentShader = document.getElementById('fragmentShader').textContent;
+
+            this.material = new THREE.ShaderMaterial({
+                uniforms: {
+                    u_resolution: { value: new THREE.Vector2(width, height) },
+                    u_time: { value: 0 },
+                    u_speed: { value: 0.5 },
+                    u_intensity: { value: 1.0 }, 
+                    u_normal: { value: 0.5 },
+                },
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                transparent: true // Enable transparency in material
+            });
+
+            const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+            this.scene.add(quad);
+        }
+
+        play() {
+            if (this.isPlaying) return;
+            this.isPlaying = true;
+            this.clock.start();
+            this.animate();
+            if(this.container) this.container.classList.add('active');
+        }
+
+        stop() {
+            this.isPlaying = false;
+            cancelAnimationFrame(this.rafId);
+            if(this.container) this.container.classList.remove('active');
+        }
+
+        updateIntensity(val) {
+            if(this.material) {
+                this.material.uniforms.u_intensity.value = val;
+                this.material.uniforms.u_speed.value = val * 0.4;
+            }
+        }
+
+        animate() {
+            if (!this.isPlaying) return;
+            this.rafId = requestAnimationFrame(() => this.animate());
+            
+            if(this.material) {
+                this.material.uniforms.u_time.value = this.clock.getElapsedTime();
+            }
+            
+            if(this.renderer && this.scene && this.camera) {
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+      }
+
+      const rainWidget = new RainWidget();
+
+
       // --- Initialization ---
       function init() {
-        // 1. Inject Widget HTML (Horizontal Layout)
+        // 1. Inject Widget HTML
         let gridHTML = `
             <div class="app-widget" id="weatherWidget">
+                <div id="rain-canvas-container"></div> <!-- RAIN CANVAS HERE -->
                 <div class="widget-left">
                     <div class="widget-main" id="widgetTime">12:45</div>
                     <div class="widget-header" id="widgetCity">San Francisco</div>
@@ -513,8 +720,6 @@
             </div>
         `;
 
-        // 2. Inject Apps - Start from index 4 to skip first row (replaced by widget)
-        // Since row is 4 cols wide and widget takes 4 cols, we still skip 4 apps to keep flow correct
         gridHTML += apps.slice(4).map(app => `
             <div class="app-item" onclick="openApp('${app.name}')">
                 <div class="app-icon ${app.style}">
@@ -529,17 +734,18 @@
 
         resize();
         
-        // Initial set
+        rainWidget.init('rain-canvas-container');
+
         setWeather('sunny');
         updateWidget();
-        setInterval(updateWidget, 1000); // Live Clock
+        setInterval(updateWidget, 1000); 
 
         requestAnimationFrame(animate);
       }
 
       // --- Resize & Layout ---
       let colliders = [];
-      let widgetCollider = null; // New variable to track the widget for masking
+      let widgetCollider = null;
 
       function resize() {
         const rect = phoneScreen.getBoundingClientRect();
@@ -552,12 +758,11 @@
 
       function updateColliders() {
         colliders = [];
-        widgetCollider = null; // Reset
+        widgetCollider = null;
         
         if (state.appOpen) return;
         const canvasRect = canvas.getBoundingClientRect();
         
-        // 1. Get Standard App Icons (For Collision & Accumulation)
         document.querySelectorAll(".app-icon").forEach((el) => {
           const rect = el.getBoundingClientRect();
           colliders.push({
@@ -569,7 +774,6 @@
           });
         });
 
-        // 2. Get Weather Widget (ONLY for Masking/Occlusion, NOT collision)
         const widgetEl = document.querySelector(".app-widget");
         if (widgetEl) {
             const rect = widgetEl.getBoundingClientRect();
@@ -588,11 +792,8 @@
           const hours = String(now.getHours()).padStart(2, '0');
           const minutes = String(now.getMinutes()).padStart(2, '0');
           document.getElementById('widgetTime').innerText = `${hours}:${minutes}`;
-          
-          // Update status bar time too
           document.querySelector('.status-bar span').innerText = `${hours}:${minutes}`;
           
-          // Weather Update based on State
           const iconEl = document.getElementById('widgetIcon');
           const tempEl = document.getElementById('widgetTemp');
           const condEl = document.getElementById('widgetCondition');
@@ -602,7 +803,6 @@
               iconEl.innerText = 'wb_sunny';
               tempEl.innerText = '72°';
               condEl.innerText = 'Sunny';
-              // Add glow to widget in sun mode too
               if(state.sunIntensity > 0) {
                   const i = state.sunIntensity;
                   widgetEl.style.boxShadow = `0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.2 * i)})`;
@@ -613,7 +813,7 @@
               tempEl.innerText = '58°';
               condEl.innerText = 'Rain';
               widgetEl.style.boxShadow = '';
-              widgetEl.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+              widgetEl.style.borderColor = 'rgba(255, 255, 255, 0.2)';
           } else if (state.weather === 'snow') {
               iconEl.innerText = 'ac_unit';
               tempEl.innerText = '28°';
@@ -632,24 +832,22 @@
       window.setRainIntensity = function(val) {
         state.rainIntensity = parseFloat(val);
         document.getElementById('rainVal').innerText = state.rainIntensity + 'x';
+        // Update shader intensity
+        rainWidget.updateIntensity(state.rainIntensity);
       }
       
       window.setSunIntensity = function(val) {
         state.sunIntensity = parseFloat(val);
         document.getElementById('sunVal').innerText = state.sunIntensity + 'x';
 
-        // Update visual lighting immediately
         const sunRays = document.getElementById('sunRays');
         const sunFilter = document.getElementById('sunFilter');
         const icons = document.querySelectorAll('.app-icon');
         const widgetEl = document.getElementById('weatherWidget');
         
-        // Apply Opacity to rays/filter (capped to avoid burnout, but scale linearly)
-        // Standard is 1x.
         if(sunRays) sunRays.style.opacity = state.sunIntensity;
         if(sunFilter) sunFilter.style.opacity = state.sunIntensity;
 
-        // Apply Icon Glow scaling
         const i = state.sunIntensity;
         const shadow = `
             0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.3 * i)}), 
@@ -665,7 +863,6 @@
             }
         });
         
-        // Widget Glow Scaling
         if(state.weather === 'sunny' && widgetEl) {
              widgetEl.style.boxShadow = `0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.2 * i)})`;
              widgetEl.style.borderColor = `rgba(255, 240, 150, ${Math.min(1, 0.4 * i)})`;
@@ -674,16 +871,13 @@
 
       window.setWeather = function (type, btn) {
         state.weather = type;
-        updateWidget(); // Immediate update text
+        updateWidget();
 
-        // UI toggles
         document.querySelectorAll(".controls-left .control-btn").forEach((b) => b.classList.remove("active"));
         if (btn) btn.classList.add("active");
         
-        // Wallpaper & Effect Toggles
         document.querySelectorAll(".wallpaper").forEach((w) => w.classList.remove("active"));
         
-        // Reset Particle Systems
         particles.drops = [];
         particles.splashes = [];
         particles.runDowns = [];
@@ -691,26 +885,21 @@
         particles.snowPiles = [];
         particles.dust = [];
 
-        // Toggle Icon Glow & Visuals
         const icons = document.querySelectorAll('.app-icon');
         const widgetEl = document.getElementById('weatherWidget');
         
-        // Slider Elements
         const snowSlider = document.getElementById('snowSliderContainer');
         const sunSlider = document.getElementById('sunSliderContainer');
         const rainSlider = document.getElementById('rainSliderContainer');
 
-        // Helper to hide all sliders
         const hideAllSliders = () => {
             [snowSlider, sunSlider, rainSlider].forEach(el => {
                 el.classList.remove('max-h-32', 'opacity-100');
             });
         };
 
-        // Reset Sun Visuals
         sunRays.classList.remove("active");
         sunFilter.classList.remove("active");
-        // Clear inline styles on icons and sun elements
         icons.forEach(icon => {
             icon.classList.remove('sun-glow');
             icon.style.boxShadow = '';
@@ -724,31 +913,29 @@
         if(sunRays) sunRays.style.opacity = '';
         if(sunFilter) sunFilter.style.opacity = '';
 
-        // Reset
         hideAllSliders();
+        
+        // --- RAIN WIDGET LOGIC ---
+        if (type === "rain") {
+            document.getElementById("bg-rain").classList.add("active");
+            rainSlider.classList.add('max-h-32', 'opacity-100');
+            rainWidget.play();
+        } else {
+            rainWidget.stop();
+        }
 
         if (type === "sunny") {
             document.getElementById("bg-sunny").classList.add("active");
             sunRays.classList.add("active");
             sunFilter.classList.add("active");
             icons.forEach(icon => icon.classList.add('sun-glow'));
-            
-            // Show Sun Slider
             sunSlider.classList.add('max-h-32', 'opacity-100');
-            
-            // Re-apply current sun intensity logic immediately
             const currentSunVal = document.querySelector('#sunSliderContainer input').value;
             setSunIntensity(currentSunVal);
 
         } else if (type === "snow") {
             document.getElementById("bg-snow").classList.add("active");
-            // Show Snow Slider
             snowSlider.classList.add('max-h-32', 'opacity-100');
-
-        } else if (type === "rain") {
-            document.getElementById("bg-rain").classList.add("active");
-            // Show Rain Slider
-            rainSlider.classList.add('max-h-32', 'opacity-100');
         }
       };
 
@@ -766,7 +953,7 @@
         setTimeout(updateColliders, 600);
       };
 
-      // --- Physics Engine ---
+      // --- Physics Engine (Global Overlay) ---
       const particles = { drops: [], splashes: [], runDowns: [], snow: [], snowPiles: [], dust: [] };
 
       // 1. Rain Logic
@@ -840,11 +1027,9 @@
           this.x += this.vx; this.y += this.vy;
           if (!state.appOpen) {
             for (let c of colliders) {
-              // Respect border-radius by keeping piles away from edges (+10, -10)
               if (this.x > c.x + 10 && this.x < c.x + c.w - 10 && this.y >= c.y && this.y < c.y + 10 && this.y - this.vy < c.y) {
                 this.dead = true; 
                 if (Math.random() > 0.4) {
-                    // Slight y-jitter for organic stacking
                     particles.snowPiles.push(new SnowPile(this.x, c.y + Math.random() * 2, this.size));
                 }
                 return;
@@ -866,8 +1051,6 @@
         draw(ctx) { 
             ctx.fillStyle = `rgba(255,255,255,${this.life})`; 
             ctx.beginPath(); 
-            // Changed from (0, Math.PI) to (0, Math.PI * 2) to draw full circles
-            // This creates a bumpy, natural top surface instead of a flat line
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); 
             ctx.fill(); 
         }
@@ -880,7 +1063,6 @@
           this.y = Math.random() * state.height;
           this.vx = (Math.random() - 0.5) * 0.5;
           this.vy = (Math.random() - 0.5) * 0.5;
-          // Balanced size: 0.5px to 3.5px
           this.size = Math.random() * 3 + 0.5; 
           this.alpha = 0;
           this.lifePhase = Math.random() * 10;
@@ -889,7 +1071,7 @@
         update() {
           this.x += this.vx; this.y += this.vy;
           this.lifePhase += this.speed;
-          this.alpha = (Math.sin(this.lifePhase) + 1) / 2 * 0.7; // Brighter dust
+          this.alpha = (Math.sin(this.lifePhase) + 1) / 2 * 0.7;
           
           if (this.x < 0) this.x = state.width;
           if (this.x > state.width) this.x = 0;
@@ -908,7 +1090,6 @@
       function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Define a helper to check if a point is "behind" the widget
         const isBehindWidget = (x, y) => {
             if (!widgetCollider) return false;
             return (
@@ -919,9 +1100,7 @@
             );
         };
 
-        // Sun Mode: Dust
         if (state.weather === 'sunny') {
-            // Adjust Dust Count Dynamically based on Slider
             const targetDust = Math.floor(60 * state.sunIntensity);
             
             if (particles.dust.length < targetDust) {
@@ -933,33 +1112,17 @@
             for (let i = 0; i < particles.dust.length; i++) {
                 let p = particles.dust[i];
                 p.update();
-                
-                // Opacity logic for widget transparency
                 const baseAlpha = p.alpha;
-                if (isBehindWidget(p.x, p.y)) {
-                    // Dim dust behind widget
-                    ctx.globalAlpha = baseAlpha * 0.4;
-                } else {
-                    ctx.globalAlpha = 1.0; // Reset or use particle internal alpha logic in draw()
-                }
-                
+                if (isBehindWidget(p.x, p.y)) ctx.globalAlpha = baseAlpha * 0.4;
+                else ctx.globalAlpha = 1.0;
                 p.draw(ctx);
-                ctx.globalAlpha = 1.0; // Reset safety
+                ctx.globalAlpha = 1.0;
             }
         } 
-        // Rain/Snow Mode
         else {
           let rate = 0;
-          
-          if (state.weather === "rain") {
-              // Rate modulated by rainIntensity
-              rate = (state.appOpen ? 1 : 2) * state.rainIntensity;
-          }
-          
-          if (state.weather === "snow") {
-              // Rate modulated by snowIntensity
-              rate = (state.appOpen ? 1 : 2) * state.snowIntensity;
-          }
+          if (state.weather === "rain") rate = (state.appOpen ? 1 : 2) * state.rainIntensity;
+          if (state.weather === "snow") rate = (state.appOpen ? 1 : 2) * state.snowIntensity;
 
           for (let i = 0; i < Math.ceil(rate); i++) {
             if (Math.random() < rate % 1 && i === Math.floor(rate)) continue;
@@ -972,20 +1135,13 @@
             for (let i = particles[key].length - 1; i >= 0; i--) {
               let p = particles[key][i]; 
               p.update();
-              
               if (p.dead) {
                   particles[key].splice(i, 1); 
               } else {
-                  // Check transparency for falling elements
-                  if (isBehindWidget(p.x, p.y)) {
-                      // Simulate dark glass tint by reducing opacity
-                      ctx.globalAlpha = 0.3; 
-                  } else {
-                      ctx.globalAlpha = 1.0;
-                  }
-                  
+                  if (isBehindWidget(p.x, p.y)) ctx.globalAlpha = 0.3; 
+                  else ctx.globalAlpha = 1.0;
                   p.draw(ctx);
-                  ctx.globalAlpha = 1.0; // Reset
+                  ctx.globalAlpha = 1.0; 
               }
             }
           });
