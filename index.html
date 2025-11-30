@@ -211,6 +211,90 @@
       .app-item:active .app-icon { transform: scale(0.92); }
       .app-name { font-size: 12px; color: white; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); font-weight: 500; }
 
+      /* --- WIDGET STYLING --- */
+      .app-widget {
+        grid-column: span 4; /* Spans full width (4 cols) */
+        grid-row: span 1;    /* Spans 1 row */
+        height: 90px;        /* Fixed height for single row */
+        /* Dark transparent glass style */
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: none;
+        border-radius: 24px;
+        /* Increased border and shadow for more "pop" */
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: row; /* Horizontal layout */
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 24px;
+        color: white;
+        position: relative;
+        z-index: 1;
+        transition: all 0.5s ease;
+        /* overflow: hidden; Removed for highlight */
+      }
+
+      /* Specular highlight removed */
+      
+      .widget-left {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .widget-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      
+      .widget-header {
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.7;
+        margin-top: 2px;
+      }
+      
+      .widget-main {
+        font-size: 36px; /* Larger time for horizontal */
+        font-weight: 300;
+        line-height: 1;
+        letter-spacing: -1px;
+      }
+      
+      .widget-sub {
+        font-size: 13px;
+        opacity: 0.9;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* --- DOCK STYLING --- */
+      .dock-container {
+        /* Matches app-widget aesthetic */
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: none;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0,0,0,0.2);
+        
+        position: relative;
+        z-index: 1;
+        /* overflow: hidden; Removed for highlight */
+        border-radius: 35px; /* Dock shape */
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      /* Specular highlight for dock removed */
+
       /* Gradients */
       .bg-blue-glass { background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(29, 78, 216, 0.8)); }
       .bg-green-glass { background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(21, 128, 61, 0.8)); }
@@ -234,8 +318,6 @@
         <span class="material-symbols-outlined text-blue-400">rainy</span>
         Raining
       </button>
-
-      <!-- REMOVED STORM BUTTON -->
 
       <button class="control-btn" onclick="setWeather('snow', this)">
         <span class="material-symbols-outlined text-white">ac_unit</span>
@@ -345,7 +427,8 @@
           
           <!-- Dock -->
           <div class="mt-auto mb-6 px-5">
-            <div class="bg-white/20 backdrop-blur-2xl border border-white/20 rounded-[35px] p-4 flex justify-between items-center px-6 shadow-xl">
+            <!-- UPDATED DOCK CONTAINER CLASS -->
+            <div class="dock-container shadow-xl">
               <div class="app-item" onclick="openApp('Phone')">
                 <div class="app-icon bg-green-glass"><span class="material-symbols-outlined">call</span></div>
               </div>
@@ -413,7 +496,26 @@
 
       // --- Initialization ---
       function init() {
-        appGrid.innerHTML = apps.map(app => `
+        // 1. Inject Widget HTML (Horizontal Layout)
+        let gridHTML = `
+            <div class="app-widget" id="weatherWidget">
+                <div class="widget-left">
+                    <div class="widget-main" id="widgetTime">12:45</div>
+                    <div class="widget-header" id="widgetCity">San Francisco</div>
+                </div>
+                <div class="widget-right">
+                    <div class="widget-sub">
+                        <span class="material-symbols-outlined text-[28px]" id="widgetIcon">wb_sunny</span>
+                        <span class="text-[28px] font-light" id="widgetTemp">72°</span>
+                    </div>
+                    <span class="text-white/60 text-[11px] mt-1" id="widgetCondition">Sunny</span>
+                </div>
+            </div>
+        `;
+
+        // 2. Inject Apps - Start from index 4 to skip first row (replaced by widget)
+        // Since row is 4 cols wide and widget takes 4 cols, we still skip 4 apps to keep flow correct
+        gridHTML += apps.slice(4).map(app => `
             <div class="app-item" onclick="openApp('${app.name}')">
                 <div class="app-icon ${app.style}">
                     ${app.name === 'Photos' ? '<img src="https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=100&h=100&fit=crop&q=80" alt="Photos" class="absolute inset-0 w-full h-full object-cover opacity-80 rounded-[14px]">' : ''}
@@ -423,16 +525,22 @@
             </div>
         `).join('');
 
+        appGrid.innerHTML = gridHTML;
+
         resize();
         
         // Initial set
         setWeather('sunny');
+        updateWidget();
+        setInterval(updateWidget, 1000); // Live Clock
 
         requestAnimationFrame(animate);
       }
 
       // --- Resize & Layout ---
       let colliders = [];
+      let widgetCollider = null; // New variable to track the widget for masking
+
       function resize() {
         const rect = phoneScreen.getBoundingClientRect();
         state.width = rect.width;
@@ -444,8 +552,12 @@
 
       function updateColliders() {
         colliders = [];
+        widgetCollider = null; // Reset
+        
         if (state.appOpen) return;
         const canvasRect = canvas.getBoundingClientRect();
+        
+        // 1. Get Standard App Icons (For Collision & Accumulation)
         document.querySelectorAll(".app-icon").forEach((el) => {
           const rect = el.getBoundingClientRect();
           colliders.push({
@@ -456,6 +568,59 @@
             el: el,
           });
         });
+
+        // 2. Get Weather Widget (ONLY for Masking/Occlusion, NOT collision)
+        const widgetEl = document.querySelector(".app-widget");
+        if (widgetEl) {
+            const rect = widgetEl.getBoundingClientRect();
+            widgetCollider = {
+                x: rect.left - canvasRect.left,
+                y: rect.top - canvasRect.top,
+                w: rect.width,
+                h: rect.height
+            };
+        }
+      }
+
+      // --- Widget Update ---
+      function updateWidget() {
+          const now = new Date();
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          document.getElementById('widgetTime').innerText = `${hours}:${minutes}`;
+          
+          // Update status bar time too
+          document.querySelector('.status-bar span').innerText = `${hours}:${minutes}`;
+          
+          // Weather Update based on State
+          const iconEl = document.getElementById('widgetIcon');
+          const tempEl = document.getElementById('widgetTemp');
+          const condEl = document.getElementById('widgetCondition');
+          const widgetEl = document.getElementById('weatherWidget');
+
+          if(state.weather === 'sunny') {
+              iconEl.innerText = 'wb_sunny';
+              tempEl.innerText = '72°';
+              condEl.innerText = 'Sunny';
+              // Add glow to widget in sun mode too
+              if(state.sunIntensity > 0) {
+                  const i = state.sunIntensity;
+                  widgetEl.style.boxShadow = `0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.2 * i)})`;
+                  widgetEl.style.borderColor = `rgba(255, 240, 150, ${Math.min(1, 0.4 * i)})`;
+              }
+          } else if (state.weather === 'rain') {
+              iconEl.innerText = 'rainy';
+              tempEl.innerText = '58°';
+              condEl.innerText = 'Rain';
+              widgetEl.style.boxShadow = '';
+              widgetEl.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          } else if (state.weather === 'snow') {
+              iconEl.innerText = 'ac_unit';
+              tempEl.innerText = '28°';
+              condEl.innerText = 'Snow';
+              widgetEl.style.boxShadow = '';
+              widgetEl.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          }
       }
 
       // --- Interaction ---
@@ -477,6 +642,7 @@
         const sunRays = document.getElementById('sunRays');
         const sunFilter = document.getElementById('sunFilter');
         const icons = document.querySelectorAll('.app-icon');
+        const widgetEl = document.getElementById('weatherWidget');
         
         // Apply Opacity to rays/filter (capped to avoid burnout, but scale linearly)
         // Standard is 1x.
@@ -485,7 +651,6 @@
 
         // Apply Icon Glow scaling
         const i = state.sunIntensity;
-        // Scale shadow alphas
         const shadow = `
             0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.3 * i)}), 
             0 0 10px rgba(255, 220, 100, ${Math.min(1, 0.2 * i)}),
@@ -499,10 +664,17 @@
                 icon.style.borderColor = border;
             }
         });
+        
+        // Widget Glow Scaling
+        if(state.weather === 'sunny' && widgetEl) {
+             widgetEl.style.boxShadow = `0 8px 25px rgba(255, 180, 50, ${Math.min(1, 0.2 * i)})`;
+             widgetEl.style.borderColor = `rgba(255, 240, 150, ${Math.min(1, 0.4 * i)})`;
+        }
       }
 
       window.setWeather = function (type, btn) {
         state.weather = type;
+        updateWidget(); // Immediate update text
 
         // UI toggles
         document.querySelectorAll(".controls-left .control-btn").forEach((b) => b.classList.remove("active"));
@@ -521,6 +693,7 @@
 
         // Toggle Icon Glow & Visuals
         const icons = document.querySelectorAll('.app-icon');
+        const widgetEl = document.getElementById('weatherWidget');
         
         // Slider Elements
         const snowSlider = document.getElementById('snowSliderContainer');
@@ -543,6 +716,11 @@
             icon.style.boxShadow = '';
             icon.style.borderColor = '';
         });
+        if(widgetEl) {
+            widgetEl.style.boxShadow = '';
+            widgetEl.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        }
+        
         if(sunRays) sunRays.style.opacity = '';
         if(sunFilter) sunFilter.style.opacity = '';
 
@@ -730,6 +908,17 @@
       function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Define a helper to check if a point is "behind" the widget
+        const isBehindWidget = (x, y) => {
+            if (!widgetCollider) return false;
+            return (
+                x >= widgetCollider.x && 
+                x <= widgetCollider.x + widgetCollider.w &&
+                y >= widgetCollider.y && 
+                y <= widgetCollider.y + widgetCollider.h
+            );
+        };
+
         // Sun Mode: Dust
         if (state.weather === 'sunny') {
             // Adjust Dust Count Dynamically based on Slider
@@ -744,7 +933,18 @@
             for (let i = 0; i < particles.dust.length; i++) {
                 let p = particles.dust[i];
                 p.update();
+                
+                // Opacity logic for widget transparency
+                const baseAlpha = p.alpha;
+                if (isBehindWidget(p.x, p.y)) {
+                    // Dim dust behind widget
+                    ctx.globalAlpha = baseAlpha * 0.4;
+                } else {
+                    ctx.globalAlpha = 1.0; // Reset or use particle internal alpha logic in draw()
+                }
+                
                 p.draw(ctx);
+                ctx.globalAlpha = 1.0; // Reset safety
             }
         } 
         // Rain/Snow Mode
@@ -770,8 +970,23 @@
 
           ["drops", "runDowns", "splashes", "snow"].forEach((key) => {
             for (let i = particles[key].length - 1; i >= 0; i--) {
-              let p = particles[key][i]; p.update();
-              if (p.dead) particles[key].splice(i, 1); else p.draw(ctx);
+              let p = particles[key][i]; 
+              p.update();
+              
+              if (p.dead) {
+                  particles[key].splice(i, 1); 
+              } else {
+                  // Check transparency for falling elements
+                  if (isBehindWidget(p.x, p.y)) {
+                      // Simulate dark glass tint by reducing opacity
+                      ctx.globalAlpha = 0.3; 
+                  } else {
+                      ctx.globalAlpha = 1.0;
+                  }
+                  
+                  p.draw(ctx);
+                  ctx.globalAlpha = 1.0; // Reset
+              }
             }
           });
 
@@ -780,6 +995,7 @@
             if (p.life <= 0) particles.snowPiles.splice(i, 1); else p.draw(ctx);
           }
         }
+        
         requestAnimationFrame(animate);
       }
 
