@@ -389,7 +389,7 @@
       }
 
       /* Container for Three.js shader */
-      #shader-canvas-container {
+      .shader-container {
         position: absolute;
         top: 0;
         left: 0;
@@ -397,11 +397,26 @@
         height: 100%;
         z-index: -1;
         opacity: 0;
-        transition: opacity 0.8s ease;
+        transition: opacity 0.8s ease; 
         border-radius: 24px;
         overflow: hidden;
       }
-      #shader-canvas-container.active {
+      .shader-container.active {
+        opacity: 1;
+      }
+      
+      /* Specific targeting for IDs */
+      #widget-shader-container, #dock-shader-container {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.8s ease;
+        overflow: hidden;
+      }
+      #widget-shader-container.active, #dock-shader-container.active {
         opacity: 1;
       }
 
@@ -455,6 +470,11 @@
         align-items: center;
         padding-left: 24px;
         padding-right: 24px;
+        overflow: hidden; /* Important for containing shader */
+      }
+      /* Ensure dock canvas respects border radius */
+      #dock-shader-container canvas {
+        border-radius: 35px;
       }
 
       .bg-blue-glass {
@@ -556,7 +576,7 @@
             oninput="setRainIntensity(this.value)"
           />
         </div>
-        
+
         <div class="mt-4 pt-4 border-t border-gray-700">
            <label
             class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2"
@@ -602,7 +622,7 @@
           <span class="text-white font-semibold">Interaction Detail:</span><br />
           Select <span class="text-blue-300">Raining</span> for water drops.<br />
           Select <span class="text-white">Snowing</span> for freezing ice shader
-          on the widget.
+          on the widget and dock.
         </p>
       </div>
     </div>
@@ -633,7 +653,7 @@
             alt="Snow"
           />
         </div>
-        
+
         <div id="fsCanvasContainer"></div>
 
         <div id="sunRays" class="sun-rays active"></div>
@@ -663,6 +683,9 @@
 
           <div class="mt-auto mb-6 px-5">
             <div class="dock-container shadow-xl">
+              <!-- DOCK SHADER CONTAINER -->
+              <div id="dock-shader-container"></div>
+              
               <div class="app-item" onclick="openApp('Phone')">
                 <div class="app-icon bg-green-glass">
                   <span class="material-symbols-outlined">call</span>
@@ -1069,7 +1092,7 @@
       const sunFilter = document.getElementById("sunFilter");
       const lightningFlash = document.getElementById("lightningFlash");
 
-      // --- THREE.JS SHADER CONTROLLER (Widget) ---
+      // --- THREE.JS SHADER CONTROLLER ---
       class WeatherEffectController {
         constructor() {
           this.container = null;
@@ -1222,7 +1245,7 @@
           this.renderer.render(this.scene, this.camera);
         }
       }
-      
+
       // --- NEW: FULL SCREEN LIGHTNING SHADER CONTROLLER ---
       class FullScreenShaderController {
         constructor() {
@@ -1311,7 +1334,10 @@
         }
       }
 
-      const weatherShader = new WeatherEffectController();
+      // We need TWO independent controllers for the glass areas (Widget & Dock)
+      const widgetWeatherShader = new WeatherEffectController();
+      const dockWeatherShader = new WeatherEffectController();
+      // And ONE independent controller for the full screen lightning
       const fsShader = new FullScreenShaderController();
 
       // --- Initialization ---
@@ -1319,7 +1345,7 @@
         // 1. Inject Widget HTML
         let gridHTML = `
             <div class="app-widget" id="weatherWidget">
-                <div id="shader-canvas-container"></div> <div class="widget-left">
+                <div id="widget-shader-container"></div> <div class="widget-left">
                     <div class="widget-main" id="widgetTime">12:45</div>
                     <div class="widget-header" id="widgetCity">San Francisco</div>
                 </div>
@@ -1358,9 +1384,9 @@
 
         resize();
 
-        // Initialize shader controller
-        weatherShader.init("shader-canvas-container");
-        // Initialize Full Screen Shader
+        // Initialize shader controllers
+        widgetWeatherShader.init("widget-shader-container");
+        dockWeatherShader.init("dock-shader-container");
         fsShader.init("fsCanvasContainer");
 
         setWeather("sunny");
@@ -1427,6 +1453,7 @@
         const tempEl = document.getElementById("widgetTemp");
         const condEl = document.getElementById("widgetCondition");
         const widgetEl = document.getElementById("weatherWidget");
+        const dockEl = document.querySelector(".dock-container");
 
         if (state.weather === "sunny") {
           iconEl.innerText = "wb_sunny";
@@ -1440,8 +1467,13 @@
                 inset 0 1px 0 rgba(255, 255, 255, ${Math.min(1, 0.6 * i)}),
                 inset 0 -1px 0 rgba(255, 200, 100, ${Math.min(1, 0.3 * i)})
             `;
+            const border = `rgba(255, 255, 255, ${0.2 + 0.1 * i})`;
+
             widgetEl.style.boxShadow = shadow;
-            widgetEl.style.borderColor = `rgba(255, 255, 255, ${0.2 + 0.1 * i})`;
+            widgetEl.style.borderColor = border;
+            
+            dockEl.style.boxShadow = shadow;
+            dockEl.style.borderColor = border;
           }
         } else if (state.weather === "rain") {
           iconEl.innerText = "rainy";
@@ -1449,12 +1481,16 @@
           condEl.innerText = "Rain";
           widgetEl.style.boxShadow = "";
           widgetEl.style.borderColor = "rgba(255, 255, 255, 0.2)";
+          dockEl.style.boxShadow = "";
+          dockEl.style.borderColor = "rgba(255, 255, 255, 0.2)";
         } else if (state.weather === "snow") {
           iconEl.innerText = "ac_unit";
           tempEl.innerText = "28°";
           condEl.innerText = "Snow";
           widgetEl.style.boxShadow = "";
           widgetEl.style.borderColor = "rgba(255, 255, 255, 0.3)";
+          dockEl.style.boxShadow = "";
+          dockEl.style.borderColor = "rgba(255, 255, 255, 0.3)";
         }
       }
 
@@ -1463,16 +1499,18 @@
         state.snowIntensity = parseFloat(val);
         document.getElementById("snowVal").innerText =
           state.snowIntensity + "x";
-        // Pass to Ice shader
-        weatherShader.updateIntensity(state.snowIntensity, "ice");
+        // Pass to Ice shader (Both)
+        widgetWeatherShader.updateIntensity(state.snowIntensity, "ice");
+        dockWeatherShader.updateIntensity(state.snowIntensity, "ice");
       };
 
       window.setRainIntensity = function (val) {
         state.rainIntensity = parseFloat(val);
         document.getElementById("rainVal").innerText =
           state.rainIntensity + "x";
-        // Pass to Rain shader
-        weatherShader.updateIntensity(state.rainIntensity, "rain");
+        // Pass to Rain shader (Both)
+        widgetWeatherShader.updateIntensity(state.rainIntensity, "rain");
+        dockWeatherShader.updateIntensity(state.rainIntensity, "rain");
       };
       
       // NEW: Lightning Slider Logic
@@ -1490,12 +1528,14 @@
         const sunFilter = document.getElementById("sunFilter");
         const icons = document.querySelectorAll(".app-icon");
         const widgetEl = document.getElementById("weatherWidget");
+        const dockEl = document.querySelector(".dock-container");
 
         if (sunRays) sunRays.style.opacity = state.sunIntensity;
         if (sunFilter) sunFilter.style.opacity = state.sunIntensity;
         
-        // Pass to Sun shader
-        weatherShader.updateIntensity(state.sunIntensity, "sun");
+        // Pass to Sun shader (Both)
+        widgetWeatherShader.updateIntensity(state.sunIntensity, "sun");
+        dockWeatherShader.updateIntensity(state.sunIntensity, "sun");
 
         const i = state.sunIntensity;
         
@@ -1505,7 +1545,6 @@
             inset 0 1px 0 rgba(255, 255, 255, ${Math.min(1, 0.6 * i)}),
             inset 0 -1px 0 rgba(255, 200, 100, ${Math.min(1, 0.3 * i)})
         `;
-        
         const border = `rgba(255, 255, 255, ${0.2 + 0.1 * i})`;
 
         icons.forEach((icon) => {
@@ -1515,9 +1554,15 @@
           }
         });
 
-        if (state.weather === "sunny" && widgetEl) {
-          widgetEl.style.boxShadow = shadow;
-          widgetEl.style.borderColor = border;
+        if (state.weather === "sunny") {
+          if (widgetEl) {
+            widgetEl.style.boxShadow = shadow;
+            widgetEl.style.borderColor = border;
+          }
+          if (dockEl) {
+            dockEl.style.boxShadow = shadow;
+            dockEl.style.borderColor = border;
+          }
         }
       };
 
@@ -1544,6 +1589,7 @@
 
         const icons = document.querySelectorAll(".app-icon");
         const widgetEl = document.getElementById("weatherWidget");
+        const dockEl = document.querySelector(".dock-container");
 
         const snowSlider = document.getElementById("snowSliderContainer");
         const sunSlider = document.getElementById("sunSliderContainer");
@@ -1563,10 +1609,15 @@
           icon.style.boxShadow = "";
           icon.style.borderColor = "";
         });
-        if (widgetEl) {
-          widgetEl.style.boxShadow = "";
-          widgetEl.style.borderColor = "rgba(255, 255, 255, 0.15)";
+        
+        const resetGlass = (el) => {
+           if(el) {
+             el.style.boxShadow = "";
+             el.style.borderColor = "rgba(255, 255, 255, 0.15)";
+           }
         }
+        resetGlass(widgetEl);
+        resetGlass(dockEl);
 
         if (sunRays) sunRays.style.opacity = "";
         if (sunFilter) sunFilter.style.opacity = "";
@@ -1574,62 +1625,77 @@
         hideAllSliders();
 
         // --- SHADER MODE SWITCHING ---
-        const container = document.getElementById("shader-canvas-container");
+        // Enhanced to apply to BOTH controllers (Widget & Dock) + Lightning Logic
         
         // Stop Full Screen Lightning Shader if not rain
         if (type !== 'rain') {
              fsShader.stop();
         }
-        
-        const applyShaderMode = () => {
-             if (type === "rain") {
-              document.getElementById("bg-rain").classList.add("active");
-              // Use max-h-48 for rain because it has 2 sliders now
-              rainSlider.classList.add("max-h-48", "opacity-100");
-              weatherShader.setMode("rain");
-              weatherShader.updateIntensity(state.rainIntensity, "rain");
-              
-              // Start Lightning Shader Loop
-              fsShader.play();
-              
-            } else if (type === "snow") {
-              document.getElementById("bg-snow").classList.add("active");
-              snowSlider.classList.add("max-h-32", "opacity-100");
-              weatherShader.setMode("ice"); // ACTIVATE ICE
-              weatherShader.updateIntensity(state.snowIntensity, "ice");
-            } else if (type === "sunny") { 
-               weatherShader.setMode("sun"); 
-               weatherShader.updateIntensity(state.sunIntensity, "sun");
+
+        const applyShaderMode = (controller, shaderType) => {
+             if (shaderType === "rain") {
+              controller.setMode("rain");
+              controller.updateIntensity(state.rainIntensity, "rain");
+            } else if (shaderType === "snow") {
+              controller.setMode("ice"); 
+              controller.updateIntensity(state.snowIntensity, "ice");
+            } else if (shaderType === "sunny") { 
+               controller.setMode("sun"); 
+               controller.updateIntensity(state.sunIntensity, "sun");
             } else {
-              weatherShader.setMode(null); // Turn off shaders
+              controller.setMode(null);
             }
         };
 
-        const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny');
-        const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny');
-        
-        if (wasShaderActive && willShaderBeActive && prevWeather !== type) {
-            container.style.transition = 'opacity 0.4s ease';
-            container.style.opacity = '0';
-            setTimeout(() => {
-                applyShaderMode();
-                void container.offsetWidth; 
-                container.style.opacity = '1';
+        const handleShaderTransition = (controller, containerId) => {
+             const container = document.getElementById(containerId);
+             if(!container) return;
+
+             const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny');
+             const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny');
+
+             if (wasShaderActive && willShaderBeActive && prevWeather !== type) {
+                // Crossfade
+                container.style.transition = 'opacity 0.4s ease';
+                container.style.opacity = '0';
+                
                 setTimeout(() => {
-                    container.style.transition = '';
-                    container.style.opacity = '';
-                }, 400);
-            }, 350); 
-        } else {
-            applyShaderMode();
+                    applyShaderMode(controller, type);
+                    void container.offsetWidth; 
+                    container.style.opacity = '1';
+                    setTimeout(() => {
+                        container.style.transition = '';
+                        container.style.opacity = '';
+                    }, 400);
+                }, 350); 
+            } else {
+                applyShaderMode(controller, type);
+            }
         }
 
+        // Apply background wallpapers
+        if (type === "rain") {
+            document.getElementById("bg-rain").classList.add("active");
+            rainSlider.classList.add("max-h-48", "opacity-100");
+            
+            // Start Lightning Shader Loop
+            fsShader.play();
+        } else if (type === "snow") {
+            document.getElementById("bg-snow").classList.add("active");
+            snowSlider.classList.add("max-h-32", "opacity-100");
+        } else if (type === "sunny") {
+            document.getElementById("bg-sunny").classList.add("active");
+            sunRays.classList.add("active");
+            sunFilter.classList.add("active");
+            icons.forEach((icon) => icon.classList.add("sun-glow"));
+            sunSlider.classList.add("max-h-32", "opacity-100");
+        }
+        
+        // Update both shaders
+        handleShaderTransition(widgetWeatherShader, "widget-shader-container");
+        handleShaderTransition(dockWeatherShader, "dock-shader-container");
+
         if (type === "sunny") {
-          document.getElementById("bg-sunny").classList.add("active");
-          sunRays.classList.add("active");
-          sunFilter.classList.add("active");
-          icons.forEach((icon) => icon.classList.add("sun-glow"));
-          sunSlider.classList.add("max-h-32", "opacity-100");
           const currentSunVal = document.querySelector(
             "#sunSliderContainer input"
           ).value;
@@ -1639,7 +1705,7 @@
 
       window.openApp = function (name) {
         state.appOpen = true;
-        // document.getElementById("appTitle").innerText = name; // Removed as element missing in HTML
+        // document.getElementById("appTitle").innerText = name; // Removed as element doesn't exist in snippet
         phoneScreen.classList.add("app-open");
         particles.snowPiles = [];
         updateColliders();
@@ -1864,7 +1930,7 @@
           ctx.shadowBlur = 0;
         }
       }
-      
+
       // --- Helper for Global Flash ---
       function triggerFlash() {
           lightningFlash.style.opacity = "0.6"; // bright flash
@@ -1892,9 +1958,7 @@
         
         // --- Lightning Logic Check ---
         if (state.weather === 'rain' && state.lightningIntensity > 0) {
-            // Random chance check
-            // Max intensity = ~1% chance per frame (approx every 1.6 sec at 60fps)
-            // Min intensity = Very rare
+            // Random chance check based on intensity slider
             if (Math.random() < 0.015 * state.lightningIntensity) {
                 triggerFlash();
             }
