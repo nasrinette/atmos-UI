@@ -179,13 +179,6 @@
       #deviceFrame.mobile .screen { border-radius: 46px; }
       #deviceFrame.mobile .hw-btn { display: block; }
       #deviceFrame.mobile .dynamic-island { display: block; }
-      #deviceFrame.mobile .app-view-container {
-        transform: translateY(100%);
-        border-radius: 0;
-      }
-      #deviceFrame.mobile .screen.app-open .app-view-container {
-        transform: translateY(0);
-      }
 
       /* DEVICE 2: DESKTOP (Custom OS) */
       #deviceFrame.desktop {
@@ -194,6 +187,7 @@
         border-radius: 12px;
         box-shadow: 0 0 0 2px #333, 0 20px 80px rgba(0,0,0,0.6);
         border: 4px solid #1a1a1a;
+        margin-left: 340px; /* Shift to right to clear menu */
       }
       #deviceFrame.desktop .screen { border-radius: 8px; }
       #deviceFrame.desktop .hw-btn { display: none; }
@@ -231,8 +225,8 @@
         display: grid;
         grid-template-columns: repeat(6, 1fr);
         grid-template-rows: auto auto;
-        gap: 24px;
-        padding: 60px 40px 100px 40px; /* Bottom padding for dock */
+        gap: 16px;
+        padding: 20px 40px 100px 40px;
         justify-content: start;
         align-content: start;
         height: 100%;
@@ -241,28 +235,26 @@
       
       /* Horizontal Side-by-Side Widgets */
       #deviceFrame.desktop .app-widget {
-        grid-column: span 3; /* Half width */
+        grid-column: span 3;
         grid-row: 1;
         width: 100%;
-        height: 140px; /* Taller for desktop */
+        height: 110px;
         margin: 0;
-        /* Force Glass Effect identical to mobile */
         background: rgba(0, 0, 0, 0.45);
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.2);
-        backdrop-filter: none; /* Rely on shader like mobile */
+        backdrop-filter: none;
       }
       
       #deviceFrame.desktop .app-widget-square {
-        grid-column: span 3; /* Half width to match weather */
+        grid-column: span 3;
         grid-row: 1;
         width: 100%;
-        height: 140px;
-        flex-direction: row; /* Horizontal layout inside battery widget for desktop */
+        height: 110px;
+        flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        aspect-ratio: auto; /* Override default 1/1 */
-        /* Force Glass Effect identical to mobile */
+        aspect-ratio: auto;
         background: rgba(0, 0, 0, 0.45);
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.2);
@@ -293,7 +285,6 @@
         min-width: auto;
         height: 80px;
         border-radius: 28px;
-        /* Inherit mobile material */
         margin: 0;
         padding: 0 20px;
         gap: 16px;
@@ -308,46 +299,6 @@
         font-size: 26px;
       }
 
-      /* Desktop Windowed App View */
-      #deviceFrame.desktop .app-view-container {
-        top: 50%; left: 50%;
-        width: 800px; height: 500px;
-        transform: translate(-50%, -50%) scale(0.95);
-        border-radius: 12px;
-        overflow: hidden;
-        opacity: 0;
-        pointer-events: none;
-        box-shadow: 0 50px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
-        background: #1e1e1e; /* Dark theme default */
-        transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-      }
-      #deviceFrame.desktop .screen.app-open .app-view-container {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-        pointer-events: auto;
-      }
-      #deviceFrame.desktop .app-card {
-        margin-top: 0;
-        height: 100%;
-        border-radius: 0;
-      }
-      /* Window Controls for Desktop (Generic) */
-      #deviceFrame.desktop .window-controls {
-        display: flex; gap: 8px; position: absolute; top: 18px; right: 18px; z-index: 50;
-      }
-      #deviceFrame.desktop .win-btn {
-        width: 12px; height: 12px; border-radius: 50%;
-        background: rgba(255,255,255,0.2);
-        transition: background 0.2s;
-        cursor: pointer;
-      }
-      #deviceFrame.desktop .win-btn:hover { background: rgba(255,255,255,0.5); }
-      #deviceFrame.desktop .win-close:hover { background: #ef4444; }
-      
-      /* Hide mobile back button on desktop */
-      #deviceFrame.desktop .mobile-back-btn { display: none; }
-
-
       /* DEVICE 3: WATCH */
       #deviceFrame.watch {
         width: 320px;
@@ -360,22 +311,82 @@
       #deviceFrame.watch .dynamic-island { display: none; }
       #deviceFrame.watch .status-bar { display: none; }
       #deviceFrame.watch .dock-container { display: none; }
+      
+      /* FIX: Remove top padding for watch so glass covers full screen */
+      #deviceFrame.watch .home-view { padding-top: 0; }
+
       #deviceFrame.watch .app-grid { 
-        grid-template-columns: repeat(2, 1fr); 
-        gap: 12px; 
-        padding: 16px; 
-        padding-top: 40px;
+        display: block; 
+        padding: 0;
+        padding-top: 0;
+        height: 100%;
       }
-      #deviceFrame.watch .app-widget { grid-column: span 2; height: 70px; padding: 0 16px; }
-      #deviceFrame.watch .app-widget-square { grid-column: span 1; padding: 10px; }
-      #deviceFrame.watch .widget-main { font-size: 24px; }
+      
+      /* --- WATCH MODIFICATION: Whole Screen Glass --- */
+      #deviceFrame.watch .app-widget { 
+        height: 100%; 
+        border-radius: 0; 
+        /* Glass Effect applied to the whole widget area */
+        background: rgba(0, 0, 0, 0.15); /* Lighter opacity */
+        backdrop-filter: blur(3px); /* Decreased blur further to match mobile widgets */
+        -webkit-backdrop-filter: blur(3px);
+        border: none;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+        padding: 0; /* Let inner container handle padding */
+        display: flex;
+        /* Parent flex properties */
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+      
+      /* Force inner container to stack vertically on watch */
+      #deviceFrame.watch .app-widget > .relative {
+          flex-direction: column !important;
+          justify-content: center !important;
+          gap: 12px;
+      }
+
+      #deviceFrame.watch .app-widget-square { display: none; }
+      
+      /* Watch specific typography & layout overrides */
+      #deviceFrame.watch .widget-main { 
+          font-size: 68px; 
+          font-weight: 200; 
+          line-height: 1;
+      }
+      #deviceFrame.watch .widget-header { 
+          font-size: 13px; 
+          margin-bottom: 0;
+          letter-spacing: 2px;
+          opacity: 0.6; 
+      }
+      #deviceFrame.watch .widget-sub { 
+          font-size: 24px; 
+          margin-top: 8px; 
+          justify-content: center;
+      }
+      #deviceFrame.watch .widget-left, #deviceFrame.watch .widget-right {
+          align-items: center; 
+          justify-content: center;
+          width: 100%;
+      }
+      /* Show the condition text on watch */
+      #deviceFrame.watch #widgetCondition {
+          display: block;
+          font-size: 16px;
+          opacity: 0.8;
+          margin-top: 12px;
+          text-transform: capitalize;
+      }
+
       #deviceFrame.watch .app-icon { width: 50px; height: 50px; }
       #deviceFrame.watch::before {
          /* Crown hint */
          content: ''; position: absolute; right: -14px; top: 80px; width: 8px; height: 24px; 
          background: #333; border-radius: 4px; border: 1px solid #444;
       }
-      #deviceFrame.watch .window-controls { display: none; }
 
       /* DEVICE 4: CAR */
       #deviceFrame.car {
@@ -383,26 +394,39 @@
         height: 380px;
         border-radius: 24px;
         border: 4px solid #333;
+        margin-left: 340px; /* Shift to right to clear menu */
       }
       #deviceFrame.car .screen { border-radius: 20px; }
       #deviceFrame.car .hw-btn { display: none; }
       #deviceFrame.car .dynamic-island { display: none; }
+      
+      /* --- CAR MODIFICATION: Right Shift Content --- */
+      #deviceFrame.car .home-view { 
+          /* Increase padding to push content right, clearing the dock */
+          padding-left: 140px; 
+          padding-top: 20px;
+          box-sizing: border-box; 
+      }
+      
       #deviceFrame.car .app-grid { 
         grid-template-columns: repeat(6, 1fr); 
         gap: 20px; 
-        padding: 30px; 
+        padding: 10px; /* Internal padding */
         display: flex;
         flex-wrap: wrap;
         align-content: flex-start;
       }
       #deviceFrame.car .app-widget { width: 300px; flex-shrink: 0; }
       #deviceFrame.car .app-widget-square { width: 140px; flex-shrink: 0; }
+      
       #deviceFrame.car .dock-container { 
-        position: absolute; left: 20px; bottom: 20px; top: 20px; width: 80px; 
-        flex-direction: column; padding: 20px 0; border-radius: 20px; justify-content: center; gap: 20px;
+        position: absolute; left: 24px; top: 50%; transform: translateY(-50%);
+        width: auto; height: auto;
+        flex-direction: column; padding: 20px; border-radius: 28px; justify-content: center; gap: 20px;
+        bottom: auto; /* reset */
+        /* Ensure dock stays on top and visually distinct */
+        z-index: 100;
       }
-      #deviceFrame.car .home-view { padding-left: 100px; padding-top: 20px; }
-      #deviceFrame.car .window-controls { display: none; }
       
       /* --- Hardware Buttons (Phone only) --- */
       .hw-btn {
@@ -525,15 +549,6 @@
           filter: blur(5px) brightness(0.7);
       }
       
-      /* Layer 3: App View */
-      .app-view-container {
-        position: absolute;
-        inset: 0;
-        z-index: 100;
-        pointer-events: none;
-        transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
-      
       .app-card {
         height: 100%;
         background: #fff;
@@ -569,12 +584,13 @@
         font-weight: 600;
         text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
       }
+      /* Simulate Camera */
       .dynamic-island {
         position: absolute;
-        top: 11px; left: 50%; transform: translateX(-50%);
-        width: 96px; height: 26px;
+        top: 12px; left: 50%; transform: translateX(-50%);
+        width: 24px; height: 24px; /* Circle */
         background: #000;
-        border-radius: 13px;
+        border-radius: 50%; /* Circle */
         z-index: 21;
         transition: width 0.3s;
       }
@@ -881,7 +897,7 @@
           <img
             id="bg-sunny"
             class="wallpaper active"
-            src="https://images.pexels.com/photos/2996071/pexels-photo-2996071.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500"
+            src="https://images.pexels.com/photos/803975/pexels-photo-803975.jpeg?cs=srgb&dl=pexels-fariphotography-803975.jpg&fm=jpg"
             alt="Sunny"
           />
         </div>
@@ -893,39 +909,13 @@
 
         <canvas id="weatherCanvas" width="390" height="800"></canvas>
         
-        <!-- App Window View -->
-        <div class="app-view-container">
-          <!-- Window Controls for Desktop -->
-          <div class="window-controls">
-              <div class="win-btn win-close" onclick="closeApp()"></div>
-              <div class="win-btn win-min"></div>
-              <div class="win-btn win-max"></div>
-          </div>
-          
-          <div class="app-card">
-            <div class="h-16 flex items-center px-4 border-b border-gray-100 shrink-0 mobile-back-btn">
-              <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition" onclick="closeApp()">
-                <span class="material-symbols-outlined text-gray-800">arrow_back</span>
-              </button>
-            </div>
-            <!-- Dummy Content for App -->
-            <div class="flex-1 bg-white p-8 overflow-auto">
-               <h1 class="text-3xl font-bold text-gray-800 mb-4">Content</h1>
-               <div class="h-40 bg-gray-100 rounded-xl mb-4"></div>
-               <div class="space-y-3">
-                   <div class="h-4 bg-gray-100 rounded w-3/4"></div>
-                   <div class="h-4 bg-gray-100 rounded w-1/2"></div>
-                   <div class="h-4 bg-gray-100 rounded w-5/6"></div>
-               </div>
-            </div>
-          </div>
-        </div>
+        <!-- App Window View Removed as per request -->
 
         <div class="home-view">
           <div class="app-grid" id="appGrid"></div>
 
           <div class="dock-container" id="dockContainer">
-             <!-- Content Injected via JS -->
+              <!-- Content Injected via JS -->
           </div>
         </div>
         
@@ -1264,10 +1254,8 @@
       };
       
       window.openApp = function (name) {
-        state.appOpen = true;
-        phoneScreen.classList.add("app-open");
-        particles.snowPiles = [];
-        updateColliders();
+        // App open logic removed as per request to remove popup content
+        console.log("Clicked app:", name);
       };
 
       window.closeApp = function () {
@@ -1378,6 +1366,38 @@
                   </div>
               `;
 
+          } else if (mode === 'watch') {
+              // WATCH LAYOUT: ONLY WEATHER WIDGET
+              appGrid.innerHTML = weatherWidgetHTML;
+              dockContainer.innerHTML = ''; // No dock for watch
+              
+          } else if (mode === 'car') {
+              // CAR LAYOUT: Widgets + Apps + Side Dock
+              
+              // 1. Weather Widget
+              gridContent += weatherWidgetHTML;
+              
+              // 2. Battery Widget + Apps
+              gridContent += batteryWidgetHTML;
+              apps.slice(4).forEach(app => gridContent += generateAppHTML(app));
+
+              appGrid.innerHTML = gridContent;
+
+              // 3. Dock (Exactly 3 items)
+              const dockApps = [
+                  {name:'Maps', icon:'map', style:'bg-green-glass'},
+                  {name:'Music', icon:'music_note', style:'bg-red-glass'},
+                  {name:'Phone', icon:'call', style:'bg-green-glass'}
+              ];
+              dockContainer.innerHTML = `<div id="shader-container-dock" class="weather-shader-layer"></div>` + 
+                  dockApps.map(app => `
+                    <div class="app-item" onclick="openApp('${app.name}')">
+                        <div class="app-icon ${app.style}">
+                            <span class="material-symbols-outlined">${app.icon}</span>
+                        </div>
+                    </div>
+                  `).join('');
+
           } else {
               // MOBILE/DEFAULT LAYOUT
               // 1. Weather Widget
@@ -1409,23 +1429,27 @@
                   `).join('');
                   
               // 5. Status Bar
-              if(mode !== 'watch') {
-                  statusBar.innerHTML = `
-                    <span>12:45</span>
-                    <div class="dynamic-island"></div>
-                    <div class="flex items-center gap-1.5 opacity-90">
-                        <span class="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
-                        <span class="material-symbols-outlined text-[18px]">wifi</span>
-                        <span class="material-symbols-outlined text-[18px]">battery_full</span>
-                    </div>
-                  `;
-              }
+              statusBar.innerHTML = `
+                <span>12:45</span>
+                <div class="dynamic-island"></div>
+                <div class="flex items-center gap-1.5 opacity-90">
+                    <span class="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
+                    <span class="material-symbols-outlined text-[18px]">wifi</span>
+                    <span class="material-symbols-outlined text-[18px]">battery_full</span>
+                </div>
+              `;
           }
 
           // Re-init shaders for new elements
           weatherShader.init("shader-canvas-container");
-          widget2Shader.init("shader-container-widget2");
-          dockShader.init("shader-container-dock");
+          if (mode !== 'watch') {
+             widget2Shader.init("shader-container-widget2");
+             dockShader.init("shader-container-dock");
+          } else {
+             // Clean up unused shaders for watch
+             widget2Shader.stop();
+             dockShader.stop();
+          }
           
           // Re-apply current weather state to new shaders
           setTimeout(() => setWeather(state.weather), 50);
