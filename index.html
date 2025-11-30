@@ -1036,7 +1036,7 @@
       vec2 DropLayer2(vec2 uv, float t) {
           vec2 UV = uv;
           uv.y += t * 0.75;
-          vec2 a = vec2(2.0, 1.);
+          vec2 a = vec2(4., 1.);
           vec2 grid = a * 2.;
           vec2 id = floor(uv * grid);
           float colShift = N(id.x);
@@ -1070,7 +1070,7 @@
       }
 
       float StaticDrops(vec2 uv, float t) {
-          uv *= 10.;
+          uv *= 25.;
           vec2 id = floor(uv);
           uv = fract(uv) - .5;
           vec3 n = N13(id.x * 107.45 + id.y * 3543.654);
@@ -1111,7 +1111,7 @@
           float dropAlpha = smoothstep(0.0, 0.05, length(n));
           vec3 dropColor = vec3(0.9, 0.95, 1.0);
 
-          gl_FragColor = vec4(dropColor * lighting + vec3(specular), dropAlpha * 0.7 * u_intensity);
+          gl_FragColor = vec4(dropColor * lighting + vec3(specular), dropAlpha * 0.4 * u_intensity);
       }
     </script>
 
