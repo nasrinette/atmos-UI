@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NextGen Weather UI - Lightning Mode</title>
+    <title>NextGen Weather UI - Fog Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
     <link
@@ -141,7 +141,7 @@
         opacity: 1;
       }
 
-      /* Layer 0.5: Full Screen Shader Canvas (Lightning) */
+      /* Layer 0.5: Full Screen Shader Canvas (Lightning/Fog) */
       #fsCanvasContainer {
         position: absolute;
         inset: 0;
@@ -442,13 +442,12 @@
 
       /* --- DOCK STYLING --- */
       .dock-container {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2),
-          0 8px 20px rgba(0, 0, 0, 0.2);
+        /* background: rgba(0, 0, 0, 0.3); -- Removed */
+        /* border: 1px solid rgba(255, 255, 255, 0.15); -- Removed */
+        /* box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.2); -- Removed */
         position: relative;
         z-index: 1;
-        border-radius: 35px;
+        /* border-radius: 35px; -- Removed */
         padding: 16px;
         display: flex;
         justify-content: space-between;
@@ -512,6 +511,11 @@
       <button class="control-btn" onclick="setWeather('snow', this)">
         <span class="material-symbols-outlined text-white">ac_unit</span>
         Snowing
+      </button>
+      
+      <button class="control-btn" onclick="setWeather('fog', this)">
+        <span class="material-symbols-outlined text-gray-400">foggy</span>
+        Foggy
       </button>
 
       <div
@@ -596,6 +600,28 @@
           />
         </div>
       </div>
+      
+      <div
+        id="fogSliderContainer"
+        class="transition-all duration-300 ease-in-out overflow-hidden max-h-0 opacity-0 mb-2"
+      >
+        <div class="mt-4 pt-4 border-t border-gray-700">
+            <label
+            class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2"
+            >
+            Fog Density <span id="fogVal" class="text-white">1x</span>
+            </label>
+            <input
+            type="range"
+            min="0"
+            max="3"
+            step="0.1"
+            value="1"
+            class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-gray-400"
+            oninput="setFogIntensity(this.value)"
+            />
+        </div>
+      </div>
 
       <div class="mt-6 pt-4 border-t border-gray-700">
         <p class="text-[11px] text-gray-400 leading-relaxed">
@@ -619,18 +645,6 @@
             class="wallpaper active"
             src="https://images.pexels.com/photos/2996071/pexels-photo-2996071.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500"
             alt="Sunny"
-          />
-          <img
-            id="bg-rain"
-            class="wallpaper"
-            src="https://images.pexels.com/photos/2996071/pexels-photo-2996071.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500"
-            alt="Rainy"
-          />
-          <img
-            id="bg-snow"
-            class="wallpaper"
-            src="https://images.pexels.com/photos/2996071/pexels-photo-2996071.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500"
-            alt="Snow"
           />
         </div>
         
@@ -662,7 +676,7 @@
           <div class="app-grid" id="appGrid"></div>
 
           <div class="mt-auto mb-6 px-5">
-            <div class="dock-container shadow-xl">
+            <div class="dock-container">
               <div class="app-item" onclick="openApp('Phone')">
                 <div class="app-icon bg-green-glass">
                   <span class="material-symbols-outlined">call</span>
@@ -704,6 +718,65 @@
         </div>
       </div>
     </div>
+    
+    <script id="fogFragmentShader" type="x-shader/x-fragment">
+      #ifdef GL_ES
+      precision highp float;
+      #endif
+
+      varying vec2 vUv;
+      uniform float u_time;
+      uniform vec2 u_resolution;
+      uniform float u_intensity;
+
+      // --- Noise Functions ---
+      float hash(float n) { return fract(sin(n) * 43758.5453123); }
+      
+      float noise(in vec2 x) {
+          vec2 p = floor(x);
+          vec2 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          float n = p.x + p.y * 57.0;
+          return mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
+                     mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y);
+      }
+
+      // Fractal Brownian Motion
+      float fbm(vec2 p) {
+          float f = 0.0;
+          f += 0.50000 * noise(p); p = p * 2.02;
+          f += 0.25000 * noise(p); p = p * 2.03;
+          f += 0.12500 * noise(p); p = p * 2.01;
+          return f;
+      }
+
+      void main() {
+          vec2 uv = vUv;
+          float time = u_time * 0.2; // Slow movement
+
+          // Layer 1: Base thick fog (moves generally right)
+          float q = fbm(uv * 3.0 + vec2(time * 0.5, time * 0.1));
+          
+          // Layer 2: Detail mist (moves slightly different direction)
+          float r = fbm(uv * 6.0 + vec2(time * 0.8, -time * 0.2) + vec2(q));
+
+          // Combine layers
+          float f = mix(q, r, 0.5);
+
+          // Density calculation based on intensity slider
+          // Using smoothstep to create "clumps" of fog rather than uniform grey
+          float density = smoothstep(0.0, 1.5 - (0.4 * u_intensity), f);
+          
+          // Color: Cool grey/white
+          vec3 fogColor = vec3(0.85, 0.88, 0.92);
+          
+          // Alpha logic: 
+          // u_intensity scales the overall opacity
+          float alpha = density * 0.7 * clamp(u_intensity, 0.0, 1.0);
+
+          gl_FragColor = vec4(fogColor, alpha);
+      }
+    </script>
 
     <script id="vertexShader" type="x-shader/x-vertex">
       varying vec2 vUv;
@@ -1056,6 +1129,7 @@
         snowIntensity: 1,
         rainIntensity: 1,
         sunIntensity: 1,
+        fogIntensity: 1,
         lightningIntensity: 0, // 0 to 1
         lightningTrigger: 0, // shader uniform
       };
@@ -1085,8 +1159,9 @@
             rain: null,
             ice: null,
             sun: null,
+            fog: null,
           };
-          this.currentMode = null; // 'rain', 'ice', 'sun'
+          this.currentMode = null; // 'rain', 'ice', 'sun', 'fog'
         }
 
         init(containerId) {
@@ -1151,6 +1226,19 @@
               document.getElementById("sunFragmentShader").textContent,
             transparent: true,
           });
+          
+          // Fog Material
+          this.materials.fog = new THREE.ShaderMaterial({
+            uniforms: {
+              u_resolution: { value: new THREE.Vector2(width, height) },
+              u_time: { value: 0 },
+              u_intensity: { value: 1.0 },
+            },
+            vertexShader: vertexShader,
+            fragmentShader:
+              document.getElementById("fogFragmentShader").textContent,
+            transparent: true,
+          });
 
           // Create Mesh with placeholder material (will be swapped)
           this.mesh = new THREE.Mesh(
@@ -1172,6 +1260,10 @@
           } else if (mode === "sun") {
             this.mesh.material = this.materials.sun;
             this.currentMode = "sun";
+            this.play();
+          } else if (mode === "fog") {
+            this.mesh.material = this.materials.fog;
+            this.currentMode = "fog";
             this.play();
           } else {
             this.stop();
@@ -1203,6 +1295,9 @@
           if (type === "sun" && this.materials.sun) {
             this.materials.sun.uniforms.u_intensity.value = val;
           }
+          if (type === "fog" && this.materials.fog) {
+            this.materials.fog.uniforms.u_intensity.value = val;
+          }
         }
 
         animate() {
@@ -1217,13 +1312,15 @@
             this.materials.ice.uniforms.u_time.value = elapsed;
           } else if (this.currentMode === "sun") {
             this.materials.sun.uniforms.u_time.value = elapsed;
+          } else if (this.currentMode === "fog") {
+            this.materials.fog.uniforms.u_time.value = elapsed;
           }
 
           this.renderer.render(this.scene, this.camera);
         }
       }
       
-      // --- NEW: FULL SCREEN LIGHTNING SHADER CONTROLLER ---
+      // --- NEW: FULL SCREEN SHADER CONTROLLER ---
       class FullScreenShaderController {
         constructor() {
           this.container = null;
@@ -1234,14 +1331,19 @@
           this.clock = new THREE.Clock();
           this.rafId = null;
           this.isPlaying = false;
-          this.material = null;
+          
+          this.materials = {
+              lightning: null,
+              fog: null
+          };
+          this.currentMode = null; // 'lightning' or 'fog'
         }
 
         init(containerId) {
             this.container = document.getElementById(containerId);
             if (!this.container) return;
 
-            const width = this.container.clientWidth || 390; // fallback if hidden
+            const width = this.container.clientWidth || 390; 
             const height = this.container.clientHeight || 800;
 
             this.scene = new THREE.Scene();
@@ -1252,22 +1354,49 @@
             this.container.appendChild(this.renderer.domElement);
 
             const vertexShader = document.getElementById("vertexShader").textContent;
-            const lightningFragment = document.getElementById("lightningFragmentShader").textContent;
 
-            this.material = new THREE.ShaderMaterial({
+            // Lightning Material
+            this.materials.lightning = new THREE.ShaderMaterial({
                 uniforms: {
                     u_resolution: { value: new THREE.Vector2(width, height) },
                     u_time: { value: 0 },
-                    u_trigger: { value: 0 }, // 0 = off, 1 = max bright
+                    u_trigger: { value: 0 }, 
                     u_seed: { value: 0.5 }
                 },
                 vertexShader: vertexShader,
-                fragmentShader: lightningFragment,
+                fragmentShader: document.getElementById("lightningFragmentShader").textContent,
                 transparent: true
             });
 
-            this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+            // Fog Material (Fullscreen)
+            this.materials.fog = new THREE.ShaderMaterial({
+                uniforms: {
+                    u_resolution: { value: new THREE.Vector2(width, height) },
+                    u_time: { value: 0 },
+                    u_intensity: { value: 1.0 },
+                },
+                vertexShader: vertexShader,
+                fragmentShader: document.getElementById("fogFragmentShader").textContent,
+                transparent: true
+            });
+
+            this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.materials.lightning);
             this.scene.add(this.mesh);
+        }
+
+        setMode(mode) {
+            this.currentMode = mode;
+            if(mode === 'lightning') {
+                this.mesh.material = this.materials.lightning;
+                // Lightning is usually "always on" but transparent until triggered, 
+                // but we only play animation loop if needed.
+                this.play(); 
+            } else if (mode === 'fog') {
+                this.mesh.material = this.materials.fog;
+                this.play();
+            } else {
+                this.stop();
+            }
         }
 
         play() {
@@ -1285,26 +1414,33 @@
         }
 
         triggerLightning() {
-            if(!this.material) return;
-            // Set random seed for bolt shape
-            this.material.uniforms.u_seed.value = Math.random();
-            // Start trigger cycle
+            if(this.currentMode !== 'lightning') return;
+            this.materials.lightning.uniforms.u_seed.value = Math.random();
             state.lightningTrigger = 1.0; 
-            this.material.uniforms.u_trigger.value = 1.0;
+            this.materials.lightning.uniforms.u_trigger.value = 1.0;
+        }
+        
+        updateIntensity(val) {
+            if(this.currentMode === 'fog' && this.materials.fog) {
+                this.materials.fog.uniforms.u_intensity.value = val;
+            }
         }
 
         animate() {
             if (!this.isPlaying) return;
             this.rafId = requestAnimationFrame(() => this.animate());
-            
-            this.material.uniforms.u_time.value = this.clock.getElapsedTime();
-            
-            // Decay lightning
-            if (state.lightningTrigger > 0) {
-                // Flash decay speed
-                state.lightningTrigger -= 0.15; 
-                if(state.lightningTrigger < 0) state.lightningTrigger = 0;
-                this.material.uniforms.u_trigger.value = state.lightningTrigger;
+            const elapsed = this.clock.getElapsedTime();
+
+            if(this.currentMode === 'lightning') {
+                this.materials.lightning.uniforms.u_time.value = elapsed;
+                // Decay logic
+                if (state.lightningTrigger > 0) {
+                    state.lightningTrigger -= 0.15; 
+                    if(state.lightningTrigger < 0) state.lightningTrigger = 0;
+                    this.materials.lightning.uniforms.u_trigger.value = state.lightningTrigger;
+                }
+            } else if (this.currentMode === 'fog') {
+                 this.materials.fog.uniforms.u_time.value = elapsed;
             }
 
             this.renderer.render(this.scene, this.camera);
@@ -1455,6 +1591,12 @@
           condEl.innerText = "Snow";
           widgetEl.style.boxShadow = "";
           widgetEl.style.borderColor = "rgba(255, 255, 255, 0.3)";
+        } else if (state.weather === "fog") {
+            iconEl.innerText = "foggy";
+            tempEl.innerText = "55°";
+            condEl.innerText = "Foggy";
+            widgetEl.style.boxShadow = "";
+            widgetEl.style.borderColor = "rgba(255, 255, 255, 0.1)";
         }
       }
 
@@ -1520,6 +1662,15 @@
           widgetEl.style.borderColor = border;
         }
       };
+      
+      window.setFogIntensity = function(val) {
+        state.fogIntensity = parseFloat(val);
+        document.getElementById("fogVal").innerText = state.fogIntensity + "x";
+        
+        // Update both Widget and Full Screen shaders
+        weatherShader.updateIntensity(state.fogIntensity, "fog");
+        fsShader.updateIntensity(state.fogIntensity);
+      };
 
       window.setWeather = function (type, btn) {
         const prevWeather = state.weather;
@@ -1548,9 +1699,10 @@
         const snowSlider = document.getElementById("snowSliderContainer");
         const sunSlider = document.getElementById("sunSliderContainer");
         const rainSlider = document.getElementById("rainSliderContainer");
+        const fogSlider = document.getElementById("fogSliderContainer");
 
         const hideAllSliders = () => {
-          [snowSlider, sunSlider, rainSlider].forEach((el) => {
+          [snowSlider, sunSlider, rainSlider, fogSlider].forEach((el) => {
             el.classList.remove("max-h-48", "opacity-100"); // increased height for rain
             el.classList.remove("max-h-32", "opacity-100");
           });
@@ -1576,37 +1728,45 @@
         // --- SHADER MODE SWITCHING ---
         const container = document.getElementById("shader-canvas-container");
         
-        // Stop Full Screen Lightning Shader if not rain
-        if (type !== 'rain') {
-             fsShader.stop();
-        }
         
         const applyShaderMode = () => {
              if (type === "rain") {
-              document.getElementById("bg-rain").classList.add("active");
+              //document.getElementById("bg-rain").classList.add("active"); // DISABLED
               // Use max-h-48 for rain because it has 2 sliders now
               rainSlider.classList.add("max-h-48", "opacity-100");
               weatherShader.setMode("rain");
               weatherShader.updateIntensity(state.rainIntensity, "rain");
               
               // Start Lightning Shader Loop
-              fsShader.play();
+              fsShader.setMode('lightning');
               
             } else if (type === "snow") {
-              document.getElementById("bg-snow").classList.add("active");
+              //document.getElementById("bg-snow").classList.add("active"); // DISABLED
               snowSlider.classList.add("max-h-32", "opacity-100");
               weatherShader.setMode("ice"); // ACTIVATE ICE
               weatherShader.updateIntensity(state.snowIntensity, "ice");
+               fsShader.stop();
             } else if (type === "sunny") { 
                weatherShader.setMode("sun"); 
                weatherShader.updateIntensity(state.sunIntensity, "sun");
+               fsShader.stop();
+            } else if (type === "fog") {
+               //document.getElementById("bg-fog").classList.add("active"); // DISABLED
+               fogSlider.classList.add("max-h-32", "opacity-100");
+               
+               weatherShader.setMode("fog");
+               weatherShader.updateIntensity(state.fogIntensity, "fog");
+               
+               fsShader.setMode("fog");
+               fsShader.updateIntensity(state.fogIntensity);
             } else {
               weatherShader.setMode(null); // Turn off shaders
+              fsShader.stop();
             }
         };
 
-        const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny');
-        const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny');
+        const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny' || prevWeather === 'fog');
+        const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny' || type === 'fog');
         
         if (wasShaderActive && willShaderBeActive && prevWeather !== type) {
             container.style.transition = 'opacity 0.4s ease';
@@ -1634,6 +1794,9 @@
             "#sunSliderContainer input"
           ).value;
           setSunIntensity(currentSunVal);
+        } else {
+          // Always ensure sunny bg is active if we disabled the others
+           document.getElementById("bg-sunny").classList.add("active");
         }
       };
 
@@ -1930,7 +2093,8 @@
             const x = Math.random() * state.width;
             if (state.weather.includes("rain"))
               particles.drops.push(new RainDrop(x, -20));
-            else particles.snow.push(new SnowFlake(x, -20));
+            else if (state.weather.includes("snow"))
+              particles.snow.push(new SnowFlake(x, -20));
           }
 
           ["drops", "runDowns", "splashes", "snow"].forEach((key) => {
