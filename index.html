@@ -565,8 +565,14 @@
           this.x += this.vx; this.y += this.vy;
           if (!state.appOpen) {
             for (let c of colliders) {
-              if (this.x > c.x && this.x < c.x + c.w && this.y >= c.y && this.y < c.y + 10 && this.y - this.vy < c.y) {
-                this.dead = true; if (Math.random() > 0.4) particles.snowPiles.push(new SnowPile(this.x, c.y, this.size)); return;
+              // Respect border-radius by keeping piles away from edges (+10, -10)
+              if (this.x > c.x + 10 && this.x < c.x + c.w - 10 && this.y >= c.y && this.y < c.y + 10 && this.y - this.vy < c.y) {
+                this.dead = true; 
+                if (Math.random() > 0.4) {
+                    // Slight y-jitter for organic stacking
+                    particles.snowPiles.push(new SnowPile(this.x, c.y + Math.random() * 2, this.size));
+                }
+                return;
               }
             }
           }
@@ -576,8 +582,20 @@
       }
 
       class SnowPile {
-        constructor(x, y, size) { this.x = x; this.y = y; this.size = size * 2; this.life = 1.0; }
-        draw(ctx) { ctx.fillStyle = `rgba(255,255,255,${this.life})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, Math.PI, 0); ctx.fill(); }
+        constructor(x, y, size) { 
+            this.x = x; 
+            this.y = y; 
+            this.size = size * 2; 
+            this.life = 1.0; 
+        }
+        draw(ctx) { 
+            ctx.fillStyle = `rgba(255,255,255,${this.life})`; 
+            ctx.beginPath(); 
+            // Changed from (0, Math.PI) to (0, Math.PI * 2) to draw full circles
+            // This creates a bumpy, natural top surface instead of a flat line
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); 
+            ctx.fill(); 
+        }
       }
 
       // 3. Dust Logic (Sun Mode)
