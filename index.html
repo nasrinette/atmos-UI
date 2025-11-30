@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NextGen Weather UI - Ice & Rain Mode</title>
+    <title>NextGen Weather UI - Lightning Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
     <link
@@ -141,6 +141,22 @@
         opacity: 1;
       }
 
+      /* Layer 0.5: Full Screen Shader Canvas (Lightning) */
+      #fsCanvasContainer {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        mix-blend-mode: screen; 
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      #fsCanvasContainer.active {
+        opacity: 1;
+      }
+
       /* --- Sun Mode Effects (Layer 1) --- */
       .sun-rays {
         position: absolute;
@@ -205,6 +221,18 @@
         to {
           transform: rotate(360deg);
         }
+      }
+
+      /* Global Flash Overlay */
+      #lightningFlash {
+        position: absolute;
+        inset: 0;
+        background: white;
+        opacity: 0;
+        z-index: 50; /* Above apps */
+        pointer-events: none;
+        mix-blend-mode: overlay;
+        transition: opacity 0.1s ease-out;
       }
 
       /* Layer 2: Home Screen */
@@ -369,7 +397,7 @@
         height: 100%;
         z-index: -1;
         opacity: 0;
-        transition: opacity 0.8s ease; /* Slightly faster transition for better responsiveness */
+        transition: opacity 0.8s ease;
         border-radius: 24px;
         overflow: hidden;
       }
@@ -528,6 +556,23 @@
             oninput="setRainIntensity(this.value)"
           />
         </div>
+        
+        <div class="mt-4 pt-4 border-t border-gray-700">
+           <label
+            class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest mb-2"
+          >
+            Lightning Freq. <span id="lightningVal" class="text-white">0%</span>
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value="0"
+            class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-400"
+            oninput="setLightningIntensity(this.value)"
+          />
+        </div>
       </div>
 
       <div
@@ -588,6 +633,8 @@
             alt="Snow"
           />
         </div>
+        
+        <div id="fsCanvasContainer"></div>
 
         <div id="sunRays" class="sun-rays active"></div>
         <div id="sunFilter" class="sun-filter active"></div>
@@ -639,6 +686,8 @@
             </div>
           </div>
         </div>
+        
+        <div id="lightningFlash"></div>
 
         <div class="status-bar">
           <span>12:45</span>
@@ -661,6 +710,75 @@
       void main() {
           vUv = uv;
           gl_Position = vec4( position, 1.0 );
+      }
+    </script>
+    
+    <script id="lightningFragmentShader" type="x-shader/x-fragment">
+      #ifdef GL_ES
+      precision highp float;
+      #endif
+      varying vec2 vUv;
+      uniform float u_time;
+      uniform float u_trigger; // 0 = off, 1 = flash frame
+      uniform vec2 u_resolution;
+      uniform float u_seed; // randomize bolt position
+
+      // Hash function
+      float hash(float n) { return fract(sin(n) * 43758.5453123); }
+
+      // Noise
+      float noise(in vec2 x) {
+          vec2 p = floor(x);
+          vec2 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          float n = p.x + p.y * 57.0;
+          return mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
+                     mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y);
+      }
+
+      // FBM
+      float fbm(vec2 p) {
+          float f = 0.0;
+          f += 0.50000 * noise(p); p = p * 2.02;
+          f += 0.25000 * noise(p); p = p * 2.03;
+          f += 0.12500 * noise(p); p = p * 2.01;
+          f += 0.06250 * noise(p); p = p * 2.04;
+          return f;
+      }
+
+      void main() {
+          vec2 uv = vUv;
+          
+          // Only render if triggered
+          if (u_trigger <= 0.0) {
+              discard;
+          }
+
+          float time = u_time;
+          
+          // Bolt shape calculation using Domain Warping
+          // Center the UV x based on seed
+          float centerX = 0.2 + (u_seed * 0.6); 
+          
+          // Distort the x coordinate based on y (height)
+          float shift = fbm(vec2(uv.y * 5.0, time * 10.0)) * 0.2; 
+          
+          // Calculate distance to the bolt line
+          float dist = abs(uv.x - centerX + shift);
+          
+          // Create the glowing line using inverse distance
+          // Sharper core, soft glow
+          float bolt = 0.002 / max(dist, 0.001);
+          
+          // Fade top and bottom slightly
+          bolt *= smoothstep(0.0, 0.1, uv.y) * smoothstep(1.0, 0.9, uv.y);
+          
+          // Flash Intensity fade out
+          bolt *= u_trigger; // u_trigger acts as alpha fade
+
+          vec3 boltColor = vec3(0.8, 0.9, 1.0);
+          
+          gl_FragColor = vec4(boltColor, bolt);
       }
     </script>
 
@@ -938,6 +1056,8 @@
         snowIntensity: 1,
         rainIntensity: 1,
         sunIntensity: 1,
+        lightningIntensity: 0, // 0 to 1
+        lightningTrigger: 0, // shader uniform
       };
 
       // --- Elements ---
@@ -947,8 +1067,9 @@
       const appGrid = document.getElementById("appGrid");
       const sunRays = document.getElementById("sunRays");
       const sunFilter = document.getElementById("sunFilter");
+      const lightningFlash = document.getElementById("lightningFlash");
 
-      // --- THREE.JS SHADER CONTROLLER ---
+      // --- THREE.JS SHADER CONTROLLER (Widget) ---
       class WeatherEffectController {
         constructor() {
           this.container = null;
@@ -1101,8 +1222,97 @@
           this.renderer.render(this.scene, this.camera);
         }
       }
+      
+      // --- NEW: FULL SCREEN LIGHTNING SHADER CONTROLLER ---
+      class FullScreenShaderController {
+        constructor() {
+          this.container = null;
+          this.scene = null;
+          this.camera = null;
+          this.renderer = null;
+          this.mesh = null;
+          this.clock = new THREE.Clock();
+          this.rafId = null;
+          this.isPlaying = false;
+          this.material = null;
+        }
+
+        init(containerId) {
+            this.container = document.getElementById(containerId);
+            if (!this.container) return;
+
+            const width = this.container.clientWidth || 390; // fallback if hidden
+            const height = this.container.clientHeight || 800;
+
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            this.renderer.setSize(width, height);
+            this.renderer.setClearColor(0x000000, 0);
+            this.container.appendChild(this.renderer.domElement);
+
+            const vertexShader = document.getElementById("vertexShader").textContent;
+            const lightningFragment = document.getElementById("lightningFragmentShader").textContent;
+
+            this.material = new THREE.ShaderMaterial({
+                uniforms: {
+                    u_resolution: { value: new THREE.Vector2(width, height) },
+                    u_time: { value: 0 },
+                    u_trigger: { value: 0 }, // 0 = off, 1 = max bright
+                    u_seed: { value: 0.5 }
+                },
+                vertexShader: vertexShader,
+                fragmentShader: lightningFragment,
+                transparent: true
+            });
+
+            this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+            this.scene.add(this.mesh);
+        }
+
+        play() {
+            if (this.isPlaying) return;
+            this.isPlaying = true;
+            this.clock.start();
+            this.container.classList.add("active");
+            this.animate();
+        }
+
+        stop() {
+            this.isPlaying = false;
+            this.container.classList.remove("active");
+            cancelAnimationFrame(this.rafId);
+        }
+
+        triggerLightning() {
+            if(!this.material) return;
+            // Set random seed for bolt shape
+            this.material.uniforms.u_seed.value = Math.random();
+            // Start trigger cycle
+            state.lightningTrigger = 1.0; 
+            this.material.uniforms.u_trigger.value = 1.0;
+        }
+
+        animate() {
+            if (!this.isPlaying) return;
+            this.rafId = requestAnimationFrame(() => this.animate());
+            
+            this.material.uniforms.u_time.value = this.clock.getElapsedTime();
+            
+            // Decay lightning
+            if (state.lightningTrigger > 0) {
+                // Flash decay speed
+                state.lightningTrigger -= 0.15; 
+                if(state.lightningTrigger < 0) state.lightningTrigger = 0;
+                this.material.uniforms.u_trigger.value = state.lightningTrigger;
+            }
+
+            this.renderer.render(this.scene, this.camera);
+        }
+      }
 
       const weatherShader = new WeatherEffectController();
+      const fsShader = new FullScreenShaderController();
 
       // --- Initialization ---
       function init() {
@@ -1150,6 +1360,8 @@
 
         // Initialize shader controller
         weatherShader.init("shader-canvas-container");
+        // Initialize Full Screen Shader
+        fsShader.init("fsCanvasContainer");
 
         setWeather("sunny");
         updateWidget();
@@ -1262,6 +1474,13 @@
         // Pass to Rain shader
         weatherShader.updateIntensity(state.rainIntensity, "rain");
       };
+      
+      // NEW: Lightning Slider Logic
+      window.setLightningIntensity = function (val) {
+          state.lightningIntensity = parseFloat(val);
+          const percent = Math.round(state.lightningIntensity * 100);
+          document.getElementById("lightningVal").innerText = percent + "%";
+      }
 
       window.setSunIntensity = function (val) {
         state.sunIntensity = parseFloat(val);
@@ -1280,11 +1499,6 @@
 
         const i = state.sunIntensity;
         
-        // REPLACED: Flat yellow border with realistic "Sun-Kissed" effect
-        // 1. Deep ambient shadow for depth
-        // 2. Subtle warm glow beneath
-        // 3. Sharp white specular highlight on top edge (inset)
-        // 4. Warm bounce light on bottom edge (inset)
         const shadow = `
             0 15px 35px -5px rgba(0, 0, 0, 0.3), 
             0 10px 20px -5px rgba(255, 160, 0, ${Math.min(1, 0.15 * i)}),
@@ -1292,7 +1506,6 @@
             inset 0 -1px 0 rgba(255, 200, 100, ${Math.min(1, 0.3 * i)})
         `;
         
-        // Subtle glass border instead of solid color
         const border = `rgba(255, 255, 255, ${0.2 + 0.1 * i})`;
 
         icons.forEach((icon) => {
@@ -1338,6 +1551,7 @@
 
         const hideAllSliders = () => {
           [snowSlider, sunSlider, rainSlider].forEach((el) => {
+            el.classList.remove("max-h-48", "opacity-100"); // increased height for rain
             el.classList.remove("max-h-32", "opacity-100");
           });
         };
@@ -1360,23 +1574,30 @@
         hideAllSliders();
 
         // --- SHADER MODE SWITCHING ---
-        // Enhanced to include cross-fading when switching between active shader modes
-        
         const container = document.getElementById("shader-canvas-container");
+        
+        // Stop Full Screen Lightning Shader if not rain
+        if (type !== 'rain') {
+             fsShader.stop();
+        }
         
         const applyShaderMode = () => {
              if (type === "rain") {
               document.getElementById("bg-rain").classList.add("active");
-              rainSlider.classList.add("max-h-32", "opacity-100");
+              // Use max-h-48 for rain because it has 2 sliders now
+              rainSlider.classList.add("max-h-48", "opacity-100");
               weatherShader.setMode("rain");
               weatherShader.updateIntensity(state.rainIntensity, "rain");
+              
+              // Start Lightning Shader Loop
+              fsShader.play();
+              
             } else if (type === "snow") {
               document.getElementById("bg-snow").classList.add("active");
               snowSlider.classList.add("max-h-32", "opacity-100");
               weatherShader.setMode("ice"); // ACTIVATE ICE
               weatherShader.updateIntensity(state.snowIntensity, "ice");
-            } else if (type === "sunny") { // ADDED SUN
-               // Note: Background handling for sunny is below, this handles just widget shader
+            } else if (type === "sunny") { 
                weatherShader.setMode("sun"); 
                weatherShader.updateIntensity(state.sunIntensity, "sun");
             } else {
@@ -1384,33 +1605,22 @@
             }
         };
 
-        // Determine if we are switching between two shader modes (e.g. Rain <-> Snow <-> Sun)
-        // If so, we fade out, swap, and fade in to prevent instant material cut.
         const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny');
         const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny');
         
         if (wasShaderActive && willShaderBeActive && prevWeather !== type) {
-            // 1. Force fade out by overriding CSS temporarily
             container.style.transition = 'opacity 0.4s ease';
             container.style.opacity = '0';
-            
             setTimeout(() => {
-                // 2. Swap material while invisible
                 applyShaderMode();
-                
-                // 3. Fade back in
-                // Force reflow to ensure opacity 0 is registered before removing it
                 void container.offsetWidth; 
                 container.style.opacity = '1';
-                
-                // Cleanup override to let class 'active' control it again
                 setTimeout(() => {
                     container.style.transition = '';
                     container.style.opacity = '';
                 }, 400);
             }, 350); 
         } else {
-            // Standard switch (e.g. Sun -> Rain) relies on class toggling
             applyShaderMode();
         }
 
@@ -1429,7 +1639,7 @@
 
       window.openApp = function (name) {
         state.appOpen = true;
-        document.getElementById("appTitle").innerText = name;
+        // document.getElementById("appTitle").innerText = name; // Removed as element missing in HTML
         phoneScreen.classList.add("app-open");
         particles.snowPiles = [];
         updateColliders();
@@ -1654,6 +1864,17 @@
           ctx.shadowBlur = 0;
         }
       }
+      
+      // --- Helper for Global Flash ---
+      function triggerFlash() {
+          lightningFlash.style.opacity = "0.6"; // bright flash
+          setTimeout(() => {
+              lightningFlash.style.opacity = "0";
+          }, 150);
+          
+          // Trigger the Shader Bolt
+          fsShader.triggerLightning();
+      }
 
       // --- Animation Loop ---
       function animate() {
@@ -1668,6 +1889,16 @@
             y <= widgetCollider.y + widgetCollider.h
           );
         };
+        
+        // --- Lightning Logic Check ---
+        if (state.weather === 'rain' && state.lightningIntensity > 0) {
+            // Random chance check
+            // Max intensity = ~1% chance per frame (approx every 1.6 sec at 60fps)
+            // Min intensity = Very rare
+            if (Math.random() < 0.015 * state.lightningIntensity) {
+                triggerFlash();
+            }
+        }
 
         if (state.weather === "sunny") {
           const targetDust = Math.floor(60 * state.sunIntensity);
