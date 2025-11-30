@@ -370,7 +370,7 @@
         grid-column: span 4;
         grid-row: span 1;
         height: 90px;
-        background: rgba(0, 0, 0, 0.3);
+        background: rgba(0, 0, 0, 0.45);
         backdrop-filter: none; /* Let canvas handle blur/texture */
         border-radius: 24px;
         border: 1px solid rgba(255, 255, 255, 0.15);
@@ -387,9 +387,28 @@
         transition: all 0.5s ease;
         overflow: hidden;
       }
+      
+      .app-widget-square {
+        grid-column: span 2;
+        grid-row: span 2;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 24px;
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        padding: 18px;
+        color: white;
+        position: relative;
+        z-index: 1;
+        backdrop-filter: none; /* Let shader handle texture */
+        aspect-ratio: 1/1;
+        transition: all 0.5s ease;
+        overflow: hidden; /* Important for shader containment */
+      }
 
       /* Container for Three.js shader */
-      #shader-canvas-container {
+      .weather-shader-layer {
         position: absolute;
         top: 0;
         left: 0;
@@ -398,10 +417,9 @@
         z-index: -1;
         opacity: 0;
         transition: opacity 0.8s ease;
-        border-radius: 24px;
         overflow: hidden;
       }
-      #shader-canvas-container.active {
+      .weather-shader-layer.active {
         opacity: 1;
       }
 
@@ -442,18 +460,21 @@
 
       /* --- DOCK STYLING --- */
       .dock-container {
-        /* background: rgba(0, 0, 0, 0.3); -- Removed */
-        /* border: 1px solid rgba(255, 255, 255, 0.15); -- Removed */
-        /* box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.2); -- Removed */
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2),
+          0 8px 20px rgba(0, 0, 0, 0.2);
         position: relative;
         z-index: 1;
-        /* border-radius: 35px; -- Removed */
+        border-radius: 35px;
         padding: 16px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding-left: 24px;
         padding-right: 24px;
+        overflow: hidden; /* Important for shader */
+        transition: all 0.5s ease;
       }
 
       .bg-blue-glass {
@@ -676,7 +697,8 @@
           <div class="app-grid" id="appGrid"></div>
 
           <div class="mt-auto mb-6 px-5">
-            <div class="dock-container">
+            <div class="dock-container" id="dockContainer">
+              <div id="shader-container-dock" class="weather-shader-layer"></div>
               <div class="app-item" onclick="openApp('Phone')">
                 <div class="app-icon bg-green-glass">
                   <span class="material-symbols-outlined">call</span>
@@ -1447,24 +1469,34 @@
         }
       }
 
+      // Create multiple shader controllers
       const weatherShader = new WeatherEffectController();
+      const widget2Shader = new WeatherEffectController();
+      const dockShader = new WeatherEffectController();
+      
       const fsShader = new FullScreenShaderController();
+      
+      // Helper for looping over all shaders
+      const allShaders = [weatherShader, widget2Shader, dockShader];
 
       // --- Initialization ---
       function init() {
         // 1. Inject Widget HTML
         let gridHTML = `
             <div class="app-widget" id="weatherWidget">
-                <div id="shader-canvas-container"></div> <div class="widget-left">
-                    <div class="widget-main" id="widgetTime">12:45</div>
-                    <div class="widget-header" id="widgetCity">San Francisco</div>
-                </div>
-                <div class="widget-right">
-                    <div class="widget-sub">
-                        <span class="material-symbols-outlined text-[28px]" id="widgetIcon">wb_sunny</span>
-                        <span class="text-[28px] font-light" id="widgetTemp">72°</span>
+                <div id="shader-canvas-container" class="weather-shader-layer"></div>
+                <div class="relative z-10 flex flex-row w-full h-full justify-between items-center px-6">
+                    <div class="widget-left">
+                        <div class="widget-main" id="widgetTime">12:45</div>
+                        <div class="widget-header" id="widgetCity">San Francisco</div>
                     </div>
-                    <span class="text-white/60 text-[11px] mt-1" id="widgetCondition">Sunny</span>
+                    <div class="widget-right">
+                        <div class="widget-sub">
+                            <span class="material-symbols-outlined text-[28px]" id="widgetIcon">wb_sunny</span>
+                            <span class="text-[28px] font-light" id="widgetTemp">72°</span>
+                        </div>
+                        <span class="text-white/60 text-[11px] mt-1" id="widgetCondition">Sunny</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -1489,13 +1521,35 @@
         `
           )
           .join("");
+          
+        // Add new square widget below icons with shader container
+        gridHTML += `
+          <div class="app-widget-square" id="batteryWidget">
+            <div id="shader-container-widget2" class="weather-shader-layer"></div>
+            <div class="relative z-10 flex flex-col w-full h-full justify-between">
+                <div class="flex justify-between items-center mb-2">
+                   <span class="material-symbols-outlined text-white/80">battery_charging_full</span>
+                   <span class="text-xs font-medium text-white/60">Battery</span>
+                </div>
+                <div class="mt-auto">
+                   <div class="text-3xl font-light mb-1">82%</div>
+                   <div class="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                     <div class="bg-green-400 h-full w-[82%]"></div>
+                   </div>
+                </div>
+            </div>
+          </div>
+        `;
 
         appGrid.innerHTML = gridHTML;
 
         resize();
 
-        // Initialize shader controller
+        // Initialize shader controllers
         weatherShader.init("shader-canvas-container");
+        widget2Shader.init("shader-container-widget2");
+        dockShader.init("shader-container-dock");
+        
         // Initialize Full Screen Shader
         fsShader.init("fsCanvasContainer");
 
@@ -1508,7 +1562,7 @@
 
       // --- Resize & Layout ---
       let colliders = [];
-      let widgetCollider = null;
+      let widgetColliders = [];
 
       function resize() {
         const rect = phoneScreen.getBoundingClientRect();
@@ -1521,7 +1575,7 @@
 
       function updateColliders() {
         colliders = [];
-        widgetCollider = null;
+        widgetColliders = [];
 
         if (state.appOpen) return;
         const canvasRect = canvas.getBoundingClientRect();
@@ -1537,16 +1591,16 @@
           });
         });
 
-        const widgetEl = document.querySelector(".app-widget");
-        if (widgetEl) {
-          const rect = widgetEl.getBoundingClientRect();
-          widgetCollider = {
-            x: rect.left - canvasRect.left,
-            y: rect.top - canvasRect.top,
-            w: rect.width,
-            h: rect.height,
-          };
-        }
+        // Include dock in widget colliders for rain transparency
+        document.querySelectorAll(".app-widget, .app-widget-square, .dock-container").forEach(el => {
+             const rect = el.getBoundingClientRect();
+             widgetColliders.push({
+                x: rect.left - canvasRect.left,
+                y: rect.top - canvasRect.top,
+                w: rect.width,
+                h: rect.height,
+             });
+        });
       }
 
       // --- Widget Update ---
@@ -1605,16 +1659,16 @@
         state.snowIntensity = parseFloat(val);
         document.getElementById("snowVal").innerText =
           state.snowIntensity + "x";
-        // Pass to Ice shader
-        weatherShader.updateIntensity(state.snowIntensity, "ice");
+        // Pass to Ice shader for all instances
+        allShaders.forEach(s => s.updateIntensity(state.snowIntensity, "ice"));
       };
 
       window.setRainIntensity = function (val) {
         state.rainIntensity = parseFloat(val);
         document.getElementById("rainVal").innerText =
           state.rainIntensity + "x";
-        // Pass to Rain shader
-        weatherShader.updateIntensity(state.rainIntensity, "rain");
+        // Pass to Rain shader for all instances
+        allShaders.forEach(s => s.updateIntensity(state.rainIntensity, "rain"));
       };
       
       // NEW: Lightning Slider Logic
@@ -1631,13 +1685,14 @@
         const sunRays = document.getElementById("sunRays");
         const sunFilter = document.getElementById("sunFilter");
         const icons = document.querySelectorAll(".app-icon");
-        const widgetEl = document.getElementById("weatherWidget");
+        // Update all widgets including dock
+        const widgets = document.querySelectorAll(".app-widget, .app-widget-square, .dock-container");
 
         if (sunRays) sunRays.style.opacity = state.sunIntensity;
         if (sunFilter) sunFilter.style.opacity = state.sunIntensity;
         
-        // Pass to Sun shader
-        weatherShader.updateIntensity(state.sunIntensity, "sun");
+        // Pass to Sun shader for all instances
+        allShaders.forEach(s => s.updateIntensity(state.sunIntensity, "sun"));
 
         const i = state.sunIntensity;
         
@@ -1657,10 +1712,12 @@
           }
         });
 
-        if (state.weather === "sunny" && widgetEl) {
-          widgetEl.style.boxShadow = shadow;
-          widgetEl.style.borderColor = border;
-        }
+        widgets.forEach((widget) => {
+            if (state.weather === "sunny") {
+                widget.style.boxShadow = shadow;
+                widget.style.borderColor = border;
+            }
+        });
       };
       
       window.setFogIntensity = function(val) {
@@ -1668,7 +1725,7 @@
         document.getElementById("fogVal").innerText = state.fogIntensity + "x";
         
         // Update both Widget and Full Screen shaders
-        weatherShader.updateIntensity(state.fogIntensity, "fog");
+        allShaders.forEach(s => s.updateIntensity(state.fogIntensity, "fog"));
         fsShader.updateIntensity(state.fogIntensity);
       };
 
@@ -1694,7 +1751,7 @@
         particles.dust = [];
 
         const icons = document.querySelectorAll(".app-icon");
-        const widgetEl = document.getElementById("weatherWidget");
+        const widgets = document.querySelectorAll(".app-widget, .app-widget-square, .dock-container");
 
         const snowSlider = document.getElementById("snowSliderContainer");
         const sunSlider = document.getElementById("sunSliderContainer");
@@ -1715,10 +1772,11 @@
           icon.style.boxShadow = "";
           icon.style.borderColor = "";
         });
-        if (widgetEl) {
-          widgetEl.style.boxShadow = "";
-          widgetEl.style.borderColor = "rgba(255, 255, 255, 0.15)";
-        }
+        
+        widgets.forEach((widget) => {
+            widget.style.boxShadow = "";
+            widget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+        });
 
         if (sunRays) sunRays.style.opacity = "";
         if (sunFilter) sunFilter.style.opacity = "";
@@ -1734,8 +1792,10 @@
               //document.getElementById("bg-rain").classList.add("active"); // DISABLED
               // Use max-h-48 for rain because it has 2 sliders now
               rainSlider.classList.add("max-h-48", "opacity-100");
-              weatherShader.setMode("rain");
-              weatherShader.updateIntensity(state.rainIntensity, "rain");
+              allShaders.forEach(s => {
+                  s.setMode("rain");
+                  s.updateIntensity(state.rainIntensity, "rain");
+              });
               
               // Start Lightning Shader Loop
               fsShader.setMode('lightning');
@@ -1743,24 +1803,30 @@
             } else if (type === "snow") {
               //document.getElementById("bg-snow").classList.add("active"); // DISABLED
               snowSlider.classList.add("max-h-32", "opacity-100");
-              weatherShader.setMode("ice"); // ACTIVATE ICE
-              weatherShader.updateIntensity(state.snowIntensity, "ice");
+              allShaders.forEach(s => {
+                  s.setMode("ice"); // ACTIVATE ICE
+                  s.updateIntensity(state.snowIntensity, "ice");
+              });
                fsShader.stop();
             } else if (type === "sunny") { 
-               weatherShader.setMode("sun"); 
-               weatherShader.updateIntensity(state.sunIntensity, "sun");
+               allShaders.forEach(s => {
+                   s.setMode("sun"); 
+                   s.updateIntensity(state.sunIntensity, "sun");
+               });
                fsShader.stop();
             } else if (type === "fog") {
                //document.getElementById("bg-fog").classList.add("active"); // DISABLED
                fogSlider.classList.add("max-h-32", "opacity-100");
                
-               weatherShader.setMode("fog");
-               weatherShader.updateIntensity(state.fogIntensity, "fog");
+               allShaders.forEach(s => {
+                   s.setMode("fog");
+                   s.updateIntensity(state.fogIntensity, "fog");
+               });
                
                fsShader.setMode("fog");
                fsShader.updateIntensity(state.fogIntensity);
             } else {
-              weatherShader.setMode(null); // Turn off shaders
+              allShaders.forEach(s => s.setMode(null)); // Turn off shaders
               fsShader.stop();
             }
         };
@@ -1768,16 +1834,25 @@
         const wasShaderActive = (prevWeather === 'rain' || prevWeather === 'snow' || prevWeather === 'sunny' || prevWeather === 'fog');
         const willShaderBeActive = (type === 'rain' || type === 'snow' || type === 'sunny' || type === 'fog');
         
+        // Apply logic to all shader containers
+        const shaderLayers = document.querySelectorAll('.weather-shader-layer');
+        
         if (wasShaderActive && willShaderBeActive && prevWeather !== type) {
-            container.style.transition = 'opacity 0.4s ease';
-            container.style.opacity = '0';
+            shaderLayers.forEach(el => {
+                el.style.transition = 'opacity 0.4s ease';
+                el.style.opacity = '0';
+            });
             setTimeout(() => {
                 applyShaderMode();
-                void container.offsetWidth; 
-                container.style.opacity = '1';
+                shaderLayers.forEach(el => {
+                    void el.offsetWidth; 
+                    el.style.opacity = '1';
+                });
                 setTimeout(() => {
-                    container.style.transition = '';
-                    container.style.opacity = '';
+                    shaderLayers.forEach(el => {
+                        el.style.transition = '';
+                        el.style.opacity = '';
+                    });
                 }, 400);
             }, 350); 
         } else {
@@ -2044,12 +2119,11 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const isBehindWidget = (x, y) => {
-          if (!widgetCollider) return false;
-          return (
-            x >= widgetCollider.x &&
-            x <= widgetCollider.x + widgetCollider.w &&
-            y >= widgetCollider.y &&
-            y <= widgetCollider.y + widgetCollider.h
+          return widgetColliders.some(c => 
+            x >= c.x &&
+            x <= c.x + c.w &&
+            y >= c.y &&
+            y <= c.y + c.h
           );
         };
         
