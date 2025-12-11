@@ -1,6 +1,6 @@
 # AtmosUI
 
-Weather and time-aware visual effects for UI elements—icons, widgets, and components—on mobile, desktop, and wearable surfaces.
+Weather and time-aware visual effects for UI elements: icons, widgets, and components, on mobile, desktop, and wearable surfaces.
 
 **Demo:** https://nasrinette.github.io/atmos-UI/
 
